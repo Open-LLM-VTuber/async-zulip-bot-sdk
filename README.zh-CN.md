@@ -46,19 +46,20 @@ pip install -e .
 
 下载 `zuliprc` 文件：
 
-你可以在 `Settings - Personal - Account & privacy` 中创建和重新创建你的 API Key，输入你的密码，并选择 `Download zuliprc`，将文件放在本项目的根目录下。
+你可以在 `Settings - Personal - Account & privacy` 中创建和重新创建你的 API Key，输入你的密码，并选择 `Download zuliprc`。请将每个机器人的凭据放在各自的目录下，例如 `bots/echo_bot/zuliprc`。
 
 #### 2. 配置 bots.yaml
 
 在根目录声明要启动的机器人及其位置：
 
 ```yaml
-zuliprc: zuliprc
 bots:
     - name: echo_bot
         module: bots.echo_bot        # 位于 bots/echo_bot/__init__.py
         class_name: BOT_CLASS        # 可选，默认使用 BOT_CLASS 或首个 BaseBot 子类
         enabled: true
+        # 可选：自定义 zuliprc 路径（默认 bots/<name>/zuliprc）
+        # zuliprc: bots/echo_bot/zuliprc
         config: {}                   # 可选，作为第二个参数传给工厂
 ```
 
@@ -104,22 +105,10 @@ class MyBot(BaseBot):
         """处理非命令消息"""
         await self.send_reply(message, "尝试使用 !help 查看可用命令！")
 
-def main():
-    setup_logging("INFO")
-    runner = BotRunner(
-        lambda client: MyBot(client),
-        client_kwargs={"config_file": "zuliprc"}
-    )
-    
-    async def run():
-        async with runner:
-            await runner.run_forever()
-    
-    asyncio.run(run())
-
-if __name__ == "__main__":
-    main()
+BOT_CLASS = MyBot
 ```
+
+将这段代码保存到你在 `bots.yaml` 中配置的目录的 `__init__.py` 文件里，例如示例中存放为 `bots/echo_bot/__init__.py`。
 
 #### 4. 运行机器人
 

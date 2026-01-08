@@ -1,6 +1,7 @@
-zuliprc: zuliprc
 bots:
   - name: echo_bot
     module: bots.echo_bot
     class_name: BOT_CLASS
     enabled: true
+    # Optional override; defaults to bots/<name>/zuliprc
+    # zuliprc: bots/echo_bot/zuliprc

@@ -39,19 +39,20 @@ pip install -e .
 
 Download your `zuliprc` file:
 
-You can create or regenerate your API Key in `Settings - Personal - Account & privacy`, enter your password, and select `Download zuliprc`. Place the file in the root directory of this project.
+You can create or regenerate your API Key in `Settings - Personal - Account & privacy`, enter your password, and select `Download zuliprc`. Place each bot's file under its own folder, e.g. `bots/echo_bot/zuliprc`.
 
 #### 2. Configure bots.yaml
 
 Define which bots to launch and where to find them:
 
 ```yaml
-zuliprc: zuliprc
 bots:
     - name: echo_bot
         module: bots.echo_bot        # package path under bots/
         class_name: BOT_CLASS        # optional; defaults to BOT_CLASS or first BaseBot subclass
         enabled: true
+        # Optional: override zuliprc path (defaults to bots/<name>/zuliprc)
+        # zuliprc: bots/echo_bot/zuliprc
         config: {}                   # optional per-bot config passed to factory (second arg)
 ```
 

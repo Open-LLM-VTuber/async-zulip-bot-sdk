@@ -2,6 +2,7 @@ import asyncio
 import importlib
 import inspect
 from contextlib import AsyncExitStack
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable, List, Optional
 
@@ -11,12 +12,18 @@ from bot_sdk import BaseBot, BotRunner, setup_logging
 from bot_sdk.config import AppConfig, load_config
 
 
-def discover_bot_factories(config: AppConfig, bots_dir: str = "bots") -> List[Callable[[Any], BaseBot]]:
-    factories: List[Callable[[Any], BaseBot]] = []
+@dataclass
+class BotSpec:
+    factory: Callable[[Any], BaseBot]
+    zuliprc: str
+
+
+def discover_bot_factories(config: AppConfig, bots_dir: str = "bots") -> List[BotSpec]:
+    specs: List[BotSpec] = []
     base_path = Path(bots_dir)
     if not base_path.exists():
         logger.warning(f"Bots directory not found: {bots_dir}")
-        return factories
+        return specs
 
     for bot_cfg in config.bots:
         if not bot_cfg.enabled:
@@ -31,8 +38,11 @@ def discover_bot_factories(config: AppConfig, bots_dir: str = "bots") -> List[Ca
         factory = _extract_factory(module, bot_cfg.class_name)
         if factory is None:
             raise RuntimeError(f"No bot factory/class found in module {module_name}")
-        factories.append(_bind_factory(factory, bot_cfg.config))
-    return factories
+        zuliprc_path = Path(bot_cfg.zuliprc or base_path / bot_cfg.name / "zuliprc")
+        if not zuliprc_path.exists():
+            raise FileNotFoundError(f"zuliprc not found for bot {bot_cfg.name}: {zuliprc_path}")
+        specs.append(BotSpec(factory=_bind_factory(factory, bot_cfg.config), zuliprc=str(zuliprc_path)))
+    return specs
 
 
 def _bind_factory(factory: Callable[..., BaseBot], bot_config: dict[str, Any]) -> Callable[[Any], BaseBot]:
@@ -61,10 +71,10 @@ def _extract_factory(module, class_name: Optional[str] = None) -> Optional[Calla
     return None
 
 
-async def run_all_bots(bot_factories: Iterable[Callable[[Any], BaseBot]], zuliprc: str) -> None:
+async def run_all_bots(bot_specs: Iterable[BotSpec]) -> None:
     runners = [
-        BotRunner(factory, client_kwargs={"config_file": zuliprc}, event_types=["message"])
-        for factory in bot_factories
+        BotRunner(spec.factory, client_kwargs={"config_file": spec.zuliprc}, event_types=["message"])
+        for spec in bot_specs
     ]
 
     if not runners:
@@ -93,6 +103,10 @@ def main() -> None:
     config_path = Path("bots.yaml")
     if not config_path.exists():
         raise FileNotFoundError("bots.yaml not found; please create it to list bots to launch")
-    app_config = load_config(str(config_path))
-    factories = discover_bot_factories(app_config)
-    asyncio.run(run_all_bots(factories, app_config.zuliprc))
+    app_config = load_config(str(config_path), AppConfig)
+    bot_specs = discover_bot_factories(app_config)
+    asyncio.run(run_all_bots(bot_specs))
+
+
+if __name__ == "__main__":
+    main()
