@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Callable, Dict, Iterable, List, Optional, Type
+from typing import Any, Callable, Dict, List, Optional, Type
 
 from .async_zulip import AsyncClient
 from .bot import BaseBot
@@ -36,6 +36,7 @@ class BotRunner:
     async def start(self) -> None:
         self.client = AsyncClient(**self.client_kwargs)
         self.bot = self.bot_factory(self.client)
+        await self.bot.post_init()
         logger.info("Bot started with event types {}", self.event_types)
         await self.client.ensure_session()
         await self.bot.on_start()

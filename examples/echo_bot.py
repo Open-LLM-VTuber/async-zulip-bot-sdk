@@ -1,7 +1,7 @@
 import asyncio
 
 from loguru import logger
-from zulip_bot_sdk import BaseBot, BotRunner, setup_logging, Message
+from bot_sdk import BaseBot, BotRunner, setup_logging, Message
 
 
 class EchoBot(BaseBot):
