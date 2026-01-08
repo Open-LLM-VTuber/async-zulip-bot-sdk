@@ -8,7 +8,6 @@ from bot_sdk import (
     CommandArgument,
     CommandSpec,
     Message,
-    UpdatePresenceRequest,
     CommandInvocation,
     setup_logging,
 )
@@ -27,19 +26,6 @@ class Translator(BaseBot):
                 handler=self._handle_echo,
             )
         )
-
-    async def on_start(self):
-        logger.info(f"{self.__class__.__name__} started with user_id: {self._user_id}")
-        await self.client.update_presence(
-            UpdatePresenceRequest(
-                status="active",
-            )
-        )
-        logger.info("Set presence to active")
-        subs = await self.client.get_subscriptions()
-        self._subscribed_streams = subs.subscriptions
-        for stream in self._subscribed_streams:
-            logger.info(f"Subscribed stream: {stream.stream_id} - {stream.name}")
 
     async def _handle_echo(self, invocation: CommandInvocation, message: Message, bot: BaseBot):
         text_parts = invocation.args.get("text") or []

@@ -5,7 +5,7 @@ from loguru import logger
 
 from .async_zulip import AsyncClient
 from .commands import CommandInvocation, CommandParser
-from .models import Event, Message, PrivateMessageRequest, StreamMessageRequest
+from .models import Event, Message, PrivateMessageRequest, StreamMessageRequest, UpdatePresenceRequest
 
 
 class BaseBot(abc.ABC):
@@ -29,12 +29,20 @@ class BaseBot(abc.ABC):
         
     async def post_init(self) -> None:
         """Hook for post-initialization logic. Override if needed."""
+        
         logger.debug("Fetching bot profile for command parser identity aliases")
         profile = await self.client.get_profile()
-        logger.debug(f"Bot profile: {profile}")
         self._user_id = profile.user_id
         self._user_name = profile.full_name
         self.command_parser.add_identity_aliases(full_name=self._user_name, email=getattr(profile, "email", None))
+        logger.info(f"{self.__class__.__name__} started with user_id: {self._user_id}")
+        
+        await self.client.update_presence(
+            UpdatePresenceRequest(
+                status="active",
+            )
+        )
+        logger.info("Set presence to active")
 
     async def on_start(self) -> None:
         """Hook for startup logic. Override if needed."""
