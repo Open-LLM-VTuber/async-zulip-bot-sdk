@@ -1,0 +1,103 @@
+site_name: Async Zulip Bot SDK
+site_description: 异步 Zulip 机器人开发框架
+site_author: Stewitch
+site_url: https://your-username.github.io/async-zulip-bot-sdk/
+
+repo_name: async-zulip-bot-sdk
+repo_url: https://github.com/your-username/async-zulip-bot-sdk
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: zh
+  palette:
+    # 浅色模式
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: 切换到深色模式
+    # 深色模式
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: 切换到浅色模式
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.annotation
+    - content.code.copy
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search:
+      lang:
+        - zh
+        - en
+  - i18n:
+      default_language: zh
+      languages:
+        zh: 简体中文
+        en: English
+      nav_translations:
+        en:
+          首页: Home
+          快速开始: Quick Start
+          核心组件: Core Components
+          概览: Overview
+          API 文档: API Reference
+          命令系统: Command System
+          数据模型: Data Models
+          配置管理: Configuration
+          日志系统: Logging
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - 首页: README.md
+  - 快速开始: quickstart.md
+  - 核心组件:
+    - 概览: core.md
+    - AsyncClient: async_client.md
+    - BaseBot: base_bot.md
+    - BotRunner: bot_runner.md
+  - API 文档:
+    - 命令系统: commands.md
+    - 数据模型: models.md
+    - 配置管理: config.md
+    - 日志系统: logging.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/your-username/async-zulip-bot-sdk
+
+copyright: Copyright &copy; 2026 Stewitch

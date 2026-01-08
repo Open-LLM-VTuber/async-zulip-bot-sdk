@@ -6,8 +6,9 @@
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Documentation](https://img.shields.io/badge/docs-mkdocs-blue.svg)](https://docs.llmvtuber.com/async-zulip-bot-sdk/)
 
-[English](README.md) | [中文](README.zh-CN.md)
+[English](README.md) | [中文](README.zh-CN.md) | [📖 Documentation](https://docs.llmvtuber.com/async-zulip-bot-sdk/)
 
 ---
 
@@ -19,8 +20,8 @@
 1. Clone the repository
 
 ```bash
-git clone https://github.com/Open-LLM-VTuber/zulip-bots
-cd zulip-bots
+git clone https://github.com/Open-LLM-VTuber/async-zulip-bot-sdk.git
+cd async-zulip-bot-sdk
 ```
 
 2. Install in a virtual environment (recommended)
@@ -217,47 +218,31 @@ async def on_message(self, message: Message):
     )
 ```
 
-#### Error Handling
+---
 
-```python
-from bot_sdk import CommandError, UnknownCommandError, InvalidArgumentsError
+## 📚 Documentation
 
-# Command parsing and dispatch automatically handle errors
-# and send friendly error messages to users
-```
+Comprehensive API documentation is available:
 
-### 📖 API Reference
+- **Online Documentation**: [https://docs.llmvtuber.com/async-zulip-bot-sdk/](https://docs.llmvtuber.com/async-zulip-bot-sdk/)
+  - 🇨🇳 [中文文档](https://docs.llmvtuber.com/async-zulip-bot-sdk/zh/)
+  - 🇬🇧 [English Docs](https://docs.llmvtuber.com/async-zulip-bot-sdk/en/)
 
-#### BaseBot
+Documentation includes:
+- 📖 Quick Start Guide
+- 🔧 API Reference (AsyncClient, BaseBot, BotRunner)
+- 💬 Command System
+- 📊 Data Models
+- ⚙️ Configuration Management
+- 📝 Logging
 
-- `command_prefixes: tuple[str, ...]` — Command prefixes (default: `("!",)`)
-- `enable_mention_commands: bool` — Enable @mention triggers (default: `True`)
-- `auto_help_command: bool` — Auto-register help command (default: `True`)
-- `async on_start()` — Startup hook
-- `async on_stop()` — Shutdown hook
-- `async on_message(message)` — Message handler hook
-- `async send_reply(message, content)` — Reply utility method
-
-#### CommandSpec
-
-- `name: str` — Command name
-- `description: str` — Command description
-- `args: List[CommandArgument]` — Argument definitions
-- `aliases: List[str]` — Command aliases
-- `handler: Callable` — Handler function
-- `show_in_help: bool` — Show in help (default: `True`)
-
-#### CommandArgument
-
-- `name: str` — Argument name
-- `type: type` — Argument type (`str`, `int`, `float`, `bool`)
-- `required: bool` — Whether required (default: `True`)
-- `description: str` — Argument description
-- `multiple: bool` — Capture remaining args (default: `False`)
+---
 
 ### 🤝 Contributing
 
 Contributions are welcome! Feel free to submit Pull Requests.
+
+**Contributing Documentation**: We welcome documentation contributions in both Chinese and English. See [docs/en/DOCS_DEPLOYMENT.md](docs/en/DOCS_DEPLOYMENT.md) for details.
 
 ### 🙏 Credits & Notices
 

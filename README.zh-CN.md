@@ -6,8 +6,9 @@
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Documentation](https://img.shields.io/badge/docs-mkdocs-blue.svg)](https://docs.llmvtuber.com/async-zulip-bot-sdk/)
 
-[English](README.md) | [中文](README.zh-CN.md)
+[English](README.md) | [中文](README.zh-CN.md) | [📖 文档](https://docs.llmvtuber.com/async-zulip-bot-sdk/)
 
 ---
 
@@ -26,8 +27,8 @@
 1. 克隆本仓库
 
 ```bash
-git clone https://github.com/Open-LLM-VTuber/zulip-bots
-cd zulip-bots
+git https://github.com/Open-LLM-VTuber/async-zulip-bot-sdk.git
+cd async-zulip-bot-sdk
 ```
 
 2. 在本地环境中安装，在这之前推荐先新建一个虚拟环境
@@ -223,47 +224,31 @@ async def on_message(self, message: Message):
     )
 ```
 
-#### 错误处理
+---
 
-```python
-from bot_sdk import CommandError, UnknownCommandError, InvalidArgumentsError
+## 📚 文档
 
-# 命令解析和调度会自动处理错误
-# 并向用户发送友好的错误消息
-```
+完整的 API 文档可在线访问：
 
-### 📖 API 参考
+- **在线文档**：[https://docs.llmvtuber.com/async-zulip-bot-sdk/](https://docs.llmvtuber.com/async-zulip-bot-sdk/)
+  - 🇨🇳 [中文文档](https://docs.llmvtuber.com/async-zulip-bot-sdk/zh/)
+  - 🇬🇧 [English Docs](https://docs.llmvtuber.com/async-zulip-bot-sdk/en/)
 
-#### BaseBot
+文档包括：
+- 📖 快速开始指南
+- 🔧 API 参考（AsyncClient、BaseBot、BotRunner）
+- 💬 命令系统
+- 📊 数据模型
+- ⚙️ 配置管理
+- 📝 日志记录
 
-- `command_prefixes: tuple[str, ...]` — 命令前缀（默认：`("!",)`）
-- `enable_mention_commands: bool` — 是否启用 @提及 触发（默认：`True`）
-- `auto_help_command: bool` — 是否自动注册 help 命令（默认：`True`）
-- `async on_start()` — 启动钩子
-- `async on_stop()` — 停止钩子
-- `async on_message(message)` — 消息处理钩子
-- `async send_reply(message, content)` — 回复消息工具方法
-
-#### CommandSpec
-
-- `name: str` — 命令名称
-- `description: str` — 命令描述
-- `args: List[CommandArgument]` — 参数定义
-- `aliases: List[str]` — 命令别名
-- `handler: Callable` — 处理函数
-- `show_in_help: bool` — 是否在帮助中显示（默认：`True`）
-
-#### CommandArgument
-
-- `name: str` — 参数名称
-- `type: type` — 参数类型（`str`, `int`, `float`, `bool`）
-- `required: bool` — 是否必需（默认：`True`）
-- `description: str` — 参数描述
-- `multiple: bool` — 是否捕获剩余所有参数（默认：`False`）
+---
 
 ### 🤝 贡献
 
 欢迎贡献！请随时提交 Pull Request。
+
+**贡献文档**：我们欢迎中英文文档的贡献。详见 [docs/DOCS_DEPLOYMENT.md](docs/DOCS_DEPLOYMENT.md)。
 
 ### 🙏 致谢与声明
 
