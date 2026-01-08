@@ -1,12 +1,13 @@
 [project]
 name = "zulip-bots"
-version = "0.1.0"
+version = "0.2.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "distro>=1.9.0",
     "httpx>=0.28.1",
-    "loguru>=0.7.2",
-    "pydantic>=2.6",
+    "loguru>=0.7.3",
+    "pydantic>=2.12.5",
+    "ruamel-yaml>=0.19.1",
 ]

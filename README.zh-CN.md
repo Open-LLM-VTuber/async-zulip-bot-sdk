@@ -46,9 +46,23 @@ pip install -e .
 
 下载 `zuliprc` 文件：
 
-你可以在 `Settings - Personal - Account & privacy` 中创建和重新创建你的 API Key，输入你的密码，并选择 `Download zuliprc`，将文件与你的项目放在同一目录中。
+你可以在 `Settings - Personal - Account & privacy` 中创建和重新创建你的 API Key，输入你的密码，并选择 `Download zuliprc`，将文件放在本项目的根目录下。
 
-#### 2. 创建你的第一个机器人
+#### 2. 配置 bots.yaml
+
+在根目录声明要启动的机器人及其位置：
+
+```yaml
+zuliprc: zuliprc
+bots:
+    - name: echo_bot
+        module: bots.echo_bot        # 位于 bots/echo_bot/__init__.py
+        class_name: BOT_CLASS        # 可选，默认使用 BOT_CLASS 或首个 BaseBot 子类
+        enabled: true
+        config: {}                   # 可选，作为第二个参数传给工厂
+```
+
+#### 3. 创建你的第一个机器人
 
 ```python
 import asyncio
@@ -107,7 +121,7 @@ if __name__ == "__main__":
     main()
 ```
 
-#### 3. 运行机器人
+#### 4. 运行机器人
 
 ```bash
 python main.py

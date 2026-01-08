@@ -1,0 +1,6 @@
+zuliprc: zuliprc
+bots:
+  - name: echo_bot
+    module: bots.echo_bot
+    class_name: BOT_CLASS
+    enabled: true

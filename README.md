@@ -39,9 +39,23 @@ pip install -e .
 
 Download your `zuliprc` file:
 
-You can create or regenerate your API Key in `Settings - Personal - Account & privacy`, enter your password, and select `Download zuliprc`. Place the file in your project directory.
+You can create or regenerate your API Key in `Settings - Personal - Account & privacy`, enter your password, and select `Download zuliprc`. Place the file in the root directory of this project.
 
-#### 2. Create Your First Bot
+#### 2. Configure bots.yaml
+
+Define which bots to launch and where to find them:
+
+```yaml
+zuliprc: zuliprc
+bots:
+    - name: echo_bot
+        module: bots.echo_bot        # package path under bots/
+        class_name: BOT_CLASS        # optional; defaults to BOT_CLASS or first BaseBot subclass
+        enabled: true
+        config: {}                   # optional per-bot config passed to factory (second arg)
+```
+
+#### 3. Create Your First Bot
 
 ```python
 import asyncio
@@ -83,24 +97,13 @@ class MyBot(BaseBot):
         """Handle non-command messages"""
         await self.send_reply(message, "Try !help to see available commands!")
 
-def main():
-    setup_logging("INFO")
-    runner = BotRunner(
-        lambda client: MyBot(client),
-        client_kwargs={"config_file": "zuliprc"}
-    )
-    
-    async def run():
-        async with runner:
-            await runner.run_forever()
-    
-    asyncio.run(run())
-
-if __name__ == "__main__":
-    main()
+BOT_CLASS = MyBot
 ```
 
-#### 3. Run Your Bot
+Remember to save this code in a `__init__.py` file under the directory your configured in `bots.yaml`.
+In this example, you would save it as `bots/echo_bot/__init__.py`.
+
+#### 4. Run Your Bots
 
 ```bash
 python main.py

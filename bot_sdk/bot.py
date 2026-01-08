@@ -18,7 +18,7 @@ class BaseBot(abc.ABC):
     """Base class for bots. Override `on_message` and optional `on_event`."""
 
     # Prefix characters that mark a command (e.g., "/help" or "!ping").
-    command_prefixes = ("!")
+    command_prefixes = ("/", "!")
     # Whether to treat leading @-mentions as commands.
     enable_mention_commands = True
     # Whether to auto-register the built-in help command.
