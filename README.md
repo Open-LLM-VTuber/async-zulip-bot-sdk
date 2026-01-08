@@ -6,9 +6,8 @@
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Documentation](https://img.shields.io/badge/docs-mkdocs-blue.svg)](https://docs.llmvtuber.com/async-zulip-bot-sdk/)
 
-[English](README.md) | [中文](README.zh-CN.md) | [📖 Documentation](https://docs.llmvtuber.com/async-zulip-bot-sdk/)
+[English](README.md) | [中文](README.zh-CN.md)
 
 ---
 
@@ -224,9 +223,7 @@ async def on_message(self, message: Message):
 
 Comprehensive API documentation is available:
 
-- **Online Documentation**: [https://docs.llmvtuber.com/async-zulip-bot-sdk/](https://docs.llmvtuber.com/async-zulip-bot-sdk/)
-  - 🇨🇳 [中文文档](https://docs.llmvtuber.com/async-zulip-bot-sdk/zh/)
-  - 🇬🇧 [English Docs](https://docs.llmvtuber.com/async-zulip-bot-sdk/en/)
+- **File Docs**: [/docs/en](/docs/en/)
 
 Documentation includes:
 - 📖 Quick Start Guide
@@ -242,7 +239,7 @@ Documentation includes:
 
 Contributions are welcome! Feel free to submit Pull Requests.
 
-**Contributing Documentation**: We welcome documentation contributions in both Chinese and English. See [docs/en/DOCS_DEPLOYMENT.md](docs/en/DOCS_DEPLOYMENT.md) for details.
+**Contributing Documentation**: We welcome documentation contributions in both Chinese and English.
 
 ### 🙏 Credits & Notices
 

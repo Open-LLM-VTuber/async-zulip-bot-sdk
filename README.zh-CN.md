@@ -6,9 +6,8 @@
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Documentation](https://img.shields.io/badge/docs-mkdocs-blue.svg)](https://docs.llmvtuber.com/async-zulip-bot-sdk/)
 
-[English](README.md) | [中文](README.zh-CN.md) | [📖 文档](https://docs.llmvtuber.com/async-zulip-bot-sdk/)
+[English](README.md) | [中文](README.zh-CN.md)
 
 ---
 
@@ -230,9 +229,7 @@ async def on_message(self, message: Message):
 
 完整的 API 文档可在线访问：
 
-- **在线文档**：[https://docs.llmvtuber.com/async-zulip-bot-sdk/](https://docs.llmvtuber.com/async-zulip-bot-sdk/)
-  - 🇨🇳 [中文文档](https://docs.llmvtuber.com/async-zulip-bot-sdk/zh/)
-  - 🇬🇧 [English Docs](https://docs.llmvtuber.com/async-zulip-bot-sdk/en/)
+- **文件文档**：[/docs](/docs/)
 
 文档包括：
 - 📖 快速开始指南
@@ -248,7 +245,7 @@ async def on_message(self, message: Message):
 
 欢迎贡献！请随时提交 Pull Request。
 
-**贡献文档**：我们欢迎中英文文档的贡献。详见 [docs/DOCS_DEPLOYMENT.md](docs/DOCS_DEPLOYMENT.md)。
+**贡献文档**：我们欢迎中英文文档的贡献。
 
 ### 🙏 致谢与声明
 
