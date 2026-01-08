@@ -10,9 +10,9 @@ with open("README.md", "r", encoding="utf-8") as fh:
 setup(
     name="async-zulip-bot-sdk",
     version="0.2.0",
-    author="",
-    author_email="",
-    description="Add your description here",
+    author="Stewitch",
+    author_email="sunksugar24@gmail.com",
+    description="Async, type-safe Zulip bot development framework in Python",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="",
