@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🤖 Zulip Bot SDK
+# 🤖 Async Zulip Bot SDK
 
 **Async, type-safe Zulip bot development framework**
 
@@ -27,9 +27,13 @@ cd zulip-bots
 
 ```bash
 # Using uv (recommended)
+uv venv
 uv pip install -e .
 
-# Or using pip
+# Or using venv + pip
+python -m venv venv
+venv\Scripts\activate  # Windows
+source venv/bin/activate  # macOS/Linux
 pip install -e .
 ```
 
@@ -254,6 +258,12 @@ from bot_sdk import CommandError, UnknownCommandError, InvalidArgumentsError
 ### 🤝 Contributing
 
 Contributions are welcome! Feel free to submit Pull Requests.
+
+### 🙏 Credits & Notices
+
+- Portions of [bot_sdk/async_zulip.py](bot_sdk/async_zulip.py) are adapted from the Zulip upstream client at https://github.com/zulip/python-zulip-api/blob/main/zulip/zulip/__init__.py.
+- The upstream project is licensed under Apache-2.0; the original license notice is preserved in the source, and the full text is included as [Apache2.0.LICENSE](Apache2.0.LICENSE).
+- Huge thanks to the Zulip team for their great work and open-source contributions.
 
 ### 📄 License
 

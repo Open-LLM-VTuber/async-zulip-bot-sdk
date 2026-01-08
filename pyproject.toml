@@ -1,5 +1,5 @@
 [project]
-name = "zulip-bots"
+name = "async-zulip-bot-sdk"
 version = "0.2.0"
 description = "Add your description here"
 readme = "README.md"
