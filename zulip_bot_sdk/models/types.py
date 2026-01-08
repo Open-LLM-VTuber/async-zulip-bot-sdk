@@ -73,5 +73,24 @@ class User(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
+class Channel(BaseModel):
+    stream_id: int
+    name: str
+    description: Optional[str] = None
+    rendered_description: Optional[str] = None
+    invite_only: Optional[bool] = None
+    is_web_public: Optional[bool] = None
+    history_public_to_subscribers: Optional[bool] = None
+    stream_post_policy: Optional[int] = None
+    message_retention_days: Optional[int] = None
+    is_announcement_only: Optional[bool] = None
+    first_message_id: Optional[int] = None
+    creation_date: Optional[int] = None
+    can_remove_subscribers_group: Optional[int] = None
+    date_created: Optional[int] = None  # some APIs return date_created
+    stream_weekly_traffic: Optional[int] = None
 
-__all__ = ["Message", "Event", "PrivateRecipient", "ProfileFieldValue", "User"]
+    model_config = ConfigDict(extra="allow")
+
+
+__all__ = ["Message", "Event", "PrivateRecipient", "ProfileFieldValue", "User", "Channel"]

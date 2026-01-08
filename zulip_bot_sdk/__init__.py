@@ -14,6 +14,7 @@ from .models import (
 	StreamMessageRequest,
 	ProfileFieldValue,
 	User,
+    UpdatePresenceRequest,
 )
 
 __all__ = [
@@ -31,5 +32,6 @@ __all__ = [
 	"UserProfileResponse",
 	"RegisterResponse",
 	"ProfileFieldValue",
+    "UpdatePresenceRequest",
 	"User",
 ]

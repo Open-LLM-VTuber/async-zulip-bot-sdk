@@ -4,7 +4,7 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict
 
-from .types import Event, ProfileFieldValue, User
+from .types import Channel, Event, User
 
 
 class RegisterResponse(BaseModel):
@@ -39,9 +39,27 @@ class UserProfileResponse(User):
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
 
+class SubscriptionsResponse(BaseModel):
+    result: str
+    msg: str = ""
+    subscriptions: List[Channel] = []
+
+    model_config = ConfigDict(extra="allow")
+
+
+class ChannelResponse(BaseModel):
+    result: str
+    msg: str = ""
+    stream: Channel
+
+    model_config = ConfigDict(extra="allow")
+
+
 __all__ = [
     "RegisterResponse",
     "EventsResponse",
     "SendMessageResponse",
     "UserProfileResponse",
+    "SubscriptionsResponse",
+    "ChannelResponse",
 ]

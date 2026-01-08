@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import List
 
 from pydantic import BaseModel, ConfigDict
-from typing_extensions import Literal
+from typing_extensions import Literal, Optional
 
 
 class StreamMessageRequest(BaseModel):
@@ -21,6 +21,16 @@ class PrivateMessageRequest(BaseModel):
     content: str
 
     model_config = ConfigDict(extra="allow")
+    
+    
+class UpdatePresenceRequest(BaseModel):
+    status: Literal["active", "idle"]
+    new_user_input: Optional[bool] = None
+    ping_only: Optional[bool] = None
+    last_update_id: Optional[int] = None
+    history_limit_days: Optional[int] = None
+
+    model_config = ConfigDict(extra="allow")
 
 
-__all__ = ["StreamMessageRequest", "PrivateMessageRequest"]
+__all__ = ["StreamMessageRequest", "PrivateMessageRequest", "UpdatePresenceRequest"]

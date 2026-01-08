@@ -58,8 +58,10 @@ from .models import (
     RegisterResponse,
     SendMessageResponse,
     StreamMessageRequest,
-    User,
     UserProfileResponse,
+    UpdatePresenceRequest,
+    SubscriptionsResponse,
+    ChannelResponse,
 )
 
 __version__ = "0.9.1-async"
@@ -813,7 +815,9 @@ class AsyncClient:
     async def get_realm_presence(self) -> Dict[str, Any]:
         return await self.call_endpoint(url="realm/presence", method="GET")
 
-    async def update_presence(self, request: Dict[str, Any]) -> Dict[str, Any]:
+    async def update_presence(self, request: Dict[str, Any] | UpdatePresenceRequest) -> Dict[str, Any]:
+        if hasattr(request, "model_dump"):
+            request = request.model_dump(exclude_none=True)
         return await self.call_endpoint(url="users/me/presence", method="POST", request=request)
 
     async def get_streams(self, **request: Any) -> Dict[str, Any]:
@@ -863,8 +867,10 @@ class AsyncClient:
             url="users/me/alert_words", method="DELETE", request={"alert_words": alert_words}
         )
 
-    async def get_subscriptions(self, request: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        return await self.call_endpoint(url="users/me/subscriptions", method="GET", request=request)
+    async def get_subscriptions(self, request: Optional[Dict[str, Any]] = None) -> SubscriptionsResponse:
+        return SubscriptionsResponse.model_validate(
+            await self.call_endpoint(url="users/me/subscriptions", method="GET", request=request)
+        )
 
     async def list_subscriptions(self, request: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         logger.warning("list_subscriptions() is deprecated. Please use get_subscriptions() instead.")
@@ -908,6 +914,11 @@ class AsyncClient:
         stream_encoded = urllib.parse.quote(stream, safe="")
         url = f"get_stream_id?stream={stream_encoded}"
         return await self.call_endpoint(url=url, method="GET", request=None)
+
+    async def get_stream(self, stream_id: int) -> ChannelResponse:
+        return ChannelResponse.model_validate(
+            await self.call_endpoint(url=f"streams/{stream_id}", method="GET")
+        )
 
     async def get_stream_topics(self, stream_id: int) -> Dict[str, Any]:
         return await self.call_endpoint(url=f"users/me/{stream_id}/topics", method="GET")
