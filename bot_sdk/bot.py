@@ -5,7 +5,13 @@ from loguru import logger
 
 from .async_zulip import AsyncClient
 from .commands import CommandInvocation, CommandParser
-from .models import Event, Message, PrivateMessageRequest, StreamMessageRequest, UpdatePresenceRequest
+from .models import (
+    Event,
+    Message,
+    PrivateMessageRequest,
+    StreamMessageRequest,
+    UpdatePresenceRequest
+)
 
 
 class BaseBot(abc.ABC):
