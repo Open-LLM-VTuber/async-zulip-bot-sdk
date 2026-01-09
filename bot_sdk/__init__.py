@@ -11,6 +11,7 @@ from .commands import (
 )
 from .runner import BotRunner
 from .logging import setup_logging
+from .storage import BotStorage, CachedStorage
 from .models import (
 	Event,
 	EventsResponse,
@@ -40,6 +41,8 @@ __all__ = [
 	"UnknownCommandError",
 	"BotRunner",
 	"setup_logging",
+	"BotStorage",
+	"CachedStorage",
 	"Event",
 	"EventsResponse",
 	"Message",
