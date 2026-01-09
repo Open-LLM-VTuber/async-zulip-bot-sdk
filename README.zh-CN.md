@@ -54,7 +54,8 @@ pip install -e .
 
 #### 2. 配置 bots.yaml
 
-在根目录声明要启动的机器人及其位置：
+在根目录创建一个 `bots.yaml` 文件，你可以参考 `bots.yaml.example` 了解详情。
+声明要启动的机器人及其位置：
 
 ```yaml
 bots:

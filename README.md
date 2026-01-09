@@ -47,17 +47,18 @@ You can create or regenerate your API Key in `Settings - Personal - Account & pr
 
 #### 2. Configure bots.yaml
 
+Create a `bots.yaml` file at the root of project, you can refer to `bots.yaml.example` for details.
 Define which bots to launch and where to find them:
 
 ```yaml
 bots:
-    - name: echo_bot
-        module: bots.echo_bot        # package path under bots/
-        class_name: BOT_CLASS        # optional; defaults to BOT_CLASS or first BaseBot subclass
-        enabled: true
-        # Optional: override zuliprc path (defaults to bots/<name>/zuliprc)
-        # zuliprc: bots/echo_bot/zuliprc
-        config: {}                   # optional per-bot config passed to factory (second arg)
+  - name: echo_bot
+    module: bots.echo_bot
+    class_name: BOT_CLASS
+    enabled: true
+    # Optional override; defaults to bots/<name>/zuliprc
+    # zuliprc: bots/echo_bot/zuliprc
+    config: {}  # optional per-bot config passed to factory (second arg)
 ```
 
 #### 3. Create Your First Bot

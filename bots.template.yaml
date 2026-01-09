@@ -5,3 +5,4 @@ bots:
     enabled: true
     # Optional override; defaults to bots/<name>/zuliprc
     # zuliprc: bots/echo_bot/zuliprc
+    config: {}  # optional per-bot config passed to factory (second arg)
