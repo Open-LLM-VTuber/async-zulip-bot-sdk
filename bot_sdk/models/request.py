@@ -33,4 +33,10 @@ class UpdatePresenceRequest(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
-__all__ = ["StreamMessageRequest", "PrivateMessageRequest", "UpdatePresenceRequest"]
+class GetUserGroupsRequest(BaseModel):
+    include_deactivated_groups: Optional[bool] = None
+
+    model_config = ConfigDict(extra="allow")
+
+
+__all__ = ["StreamMessageRequest", "PrivateMessageRequest", "UpdatePresenceRequest", "GetUserGroupsRequest"]

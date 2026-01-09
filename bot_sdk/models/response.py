@@ -4,7 +4,7 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict
 
-from .types import Channel, Event, User
+from .types import Channel, Event, User, UserGroup
 
 
 class RegisterResponse(BaseModel):
@@ -55,6 +55,14 @@ class ChannelResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
+class GetUserGroupsResponse(BaseModel):
+    result: str
+    msg: str = ""
+    user_groups: List[UserGroup] = []
+
+    model_config = ConfigDict(extra="allow")
+
+
 __all__ = [
     "RegisterResponse",
     "EventsResponse",
@@ -62,4 +70,5 @@ __all__ = [
     "UserProfileResponse",
     "SubscriptionsResponse",
     "ChannelResponse",
+    "GetUserGroupsResponse",
 ]

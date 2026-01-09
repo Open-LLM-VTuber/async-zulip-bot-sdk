@@ -2,6 +2,7 @@ from .request import (
     StreamMessageRequest,
     PrivateMessageRequest,
     UpdatePresenceRequest,
+    GetUserGroupsRequest,
 )
 from .response import (
     RegisterResponse,
@@ -10,6 +11,7 @@ from .response import (
     UserProfileResponse,
     SubscriptionsResponse,
     ChannelResponse,
+    GetUserGroupsResponse,
 )
 from .types import (
     Message,
@@ -18,6 +20,8 @@ from .types import (
     ProfileFieldValue,
     User,
     Channel,
+    UserGroup,
+    GroupSettingValue,
 )
 
 __all__ = [
@@ -36,4 +40,8 @@ __all__ = [
     "Event",
     "PrivateRecipient",
     "UpdatePresenceRequest",
+    "GetUserGroupsRequest",
+    "GetUserGroupsResponse",
+    "UserGroup",
+    "GroupSettingValue",
 ]

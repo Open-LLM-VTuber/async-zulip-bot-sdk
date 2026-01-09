@@ -68,6 +68,8 @@ from .models import (
     UpdatePresenceRequest,
     SubscriptionsResponse,
     ChannelResponse,
+    GetUserGroupsResponse,
+    GetUserGroupsRequest,
 )
 
 __version__ = "0.9.1-async"
@@ -932,8 +934,17 @@ class AsyncClient:
     async def get_stream_email_address(self, stream_id: int) -> Dict[str, Any]:
         return await self.call_endpoint(url=f"streams/{stream_id}/email_address", method="GET")
 
-    async def get_user_groups(self) -> Dict[str, Any]:
-        return await self.call_endpoint(url="user_groups", method="GET")
+    async def get_user_groups(self, request: Optional[Dict[str, Any] | GetUserGroupsRequest] = None) -> GetUserGroupsResponse:
+        payload = {}
+        if request is not None:
+            if hasattr(request, "model_dump"):
+                payload = request.model_dump(exclude_none=True)
+            else:
+                payload = {k: v for k, v in request.items() if v is not None}
+        
+        return GetUserGroupsResponse.model_validate(
+            await self.call_endpoint(url="user_groups", method="GET", request=payload)
+        )
 
     async def create_user_group(self, group_data: Dict[str, Any]) -> Dict[str, Any]:
         return await self.call_endpoint(url="user_groups/create", method="POST", request=group_data)

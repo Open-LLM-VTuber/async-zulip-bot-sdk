@@ -93,4 +93,33 @@ class Channel(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
-__all__ = ["Message", "Event", "PrivateRecipient", "ProfileFieldValue", "User", "Channel"]
+class GroupSettingValue(BaseModel):
+    """A group-setting value that can be either a group ID or an object with direct members/subgroups."""
+    direct_members: Optional[List[int]] = None
+    direct_subgroups: Optional[List[int]] = None
+
+    model_config = ConfigDict(extra="allow")
+
+
+class UserGroup(BaseModel):
+    """Represents a user group in Zulip organization."""
+    id: int
+    name: str
+    description: str
+    members: List[int]
+    direct_subgroup_ids: List[int]
+    is_system_group: bool
+    creator_id: Optional[int] = None
+    date_created: Optional[int] = None
+    can_add_members_group: Optional[Union[int, GroupSettingValue]] = None
+    can_join_group: Optional[Union[int, GroupSettingValue]] = None
+    can_leave_group: Optional[Union[int, GroupSettingValue]] = None
+    can_manage_group: Optional[Union[int, GroupSettingValue]] = None
+    can_mention_group: Optional[Union[int, GroupSettingValue]] = None
+    can_remove_members_group: Optional[Union[int, GroupSettingValue]] = None
+    deactivated: Optional[bool] = None
+
+    model_config = ConfigDict(extra="allow")
+
+
+__all__ = ["Message", "Event", "PrivateRecipient", "ProfileFieldValue", "User", "Channel", "GroupSettingValue", "UserGroup"]
