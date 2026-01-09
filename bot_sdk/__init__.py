@@ -24,6 +24,8 @@ from .models import (
 	ProfileFieldValue,
 	User,
     UpdatePresenceRequest,
+    GetUserGroupsRequest,
+	GetUserGroupsResponse,
 )
 
 __all__ = [
@@ -50,4 +52,6 @@ __all__ = [
 	"ProfileFieldValue",
     "UpdatePresenceRequest",
 	"User",
+    "GetUserGroupsRequest",
+	"GetUserGroupsResponse",
 ]
