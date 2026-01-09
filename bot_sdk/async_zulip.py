@@ -616,6 +616,7 @@ class AsyncClient:
         callback: Callable[[Event], Awaitable[None]] | Callable[[Event], None],
         event_types: Optional[List[str]] = None,
         narrow: Optional[List[List[str]]] = None,
+        stop_event: Optional[asyncio.Event] = None,
         **kwargs: object,
     ) -> None:
         if narrow is None:
@@ -636,6 +637,8 @@ class AsyncClient:
 
         queue_id: Optional[str] = None
         while True:
+            if stop_event and stop_event.is_set():
+                return
             if queue_id is None:
                 queue_id, last_event_id = await do_register()
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import abc
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 import importlib
 import inspect
 from pathlib import Path
@@ -19,6 +19,9 @@ from .models import (
     StreamMessageRequest,
     UpdatePresenceRequest
 )
+
+if TYPE_CHECKING:  # pragma: no cover - type-only import to avoid cycles
+    from .runner import BotRunner
 
 
 class BaseBot(abc.ABC):
@@ -45,7 +48,12 @@ class BaseBot(abc.ABC):
         self.storage: Optional[BotStorage] = None
         self.settings: Optional[BotLocalConfig] = None
         self.perms: Optional[PermissionPolicy] = None
+        self._runner: Optional["BotRunner"] = None
         logger.debug(f"Initialized bot {self.__class__.__name__}")
+
+    def set_runner(self, runner: "BotRunner") -> None:
+        """Called by BotRunner to allow commands to signal runner actions."""
+        self._runner = runner
         
     async def post_init(self) -> None:
         """Hook for post-initialization logic. Override if needed.
@@ -155,6 +163,14 @@ class BaseBot(abc.ABC):
                 ],
                 handler=self._handle_perm,
                 min_level=default_levels.get("bot_owner", 200),
+            )
+        )
+        # Built-in: stop (bot shutdown)
+        self.command_parser.register_spec(
+            CommandSpec(
+                name="stop",
+                description="Stop the bot",
+                handler=self._handle_stop,
             )
         )
         # Hook for subclasses
@@ -288,14 +304,44 @@ class BaseBot(abc.ABC):
 
         await self.send_reply(message, err("Unknown action. Use: set_owner | roles_show | roles_set | allow_stop | deny_stop"))
 
+    async def _handle_stop(self, invocation: CommandInvocation, message: Message, bot: BaseBot) -> None:
+        """Stop the bot if the caller is authorized."""
+        requester = message.sender_id
+        # Compute unified permission level (handles bot_owner, org owner/admin) and fallback ACL.
+        role_levels = (self.settings.role_levels if self.settings else {"user": 1, "admin": 50, "owner": 100, "bot_owner": 200})
+        stop_min = role_levels.get("admin", 50)  # admins/owners/bot_owner all meet or exceed this
+        try:
+            user_level = await self._compute_user_level(requester)
+        except Exception as exc:
+            logger.warning(f"Stop permission level check failed: {exc}")
+            user_level = 0
+
+        acl_allowed = False
+        if self.storage:
+            try:
+                acl = await self.storage.get("acl.stop", [])
+                acl_allowed = requester in set(acl)
+            except Exception:
+                acl_allowed = False
+
+        if user_level < stop_min and not acl_allowed:
+            await self.send_reply(message, "❌ Permission denied: you cannot stop this bot.")
+            return
+
+        await self.send_reply(message, "🛑 Stopping the bot...")
+        if self._runner:
+            self._runner.request_stop(reason=f"requested by user {requester}")
+        else:
+            logger.warning("Stop requested but runner reference is missing; bot may keep running")
+
     async def on_start(self) -> None:
         """Hook for startup logic. Override if needed."""
         return None
 
     async def on_stop(self) -> None:
         """Hook for cleanup logic. Override if needed."""
+        logger.info("Bot stopping, performing cleanup...")
         await self.save_settings()
-        logger.info("Bot stopped")
 
     async def on_event(self, event: Event) -> None:
         if event.type == "message" and event.message is not None:
