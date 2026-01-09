@@ -8,7 +8,7 @@ from pathlib import Path
 from loguru import logger
 
 from .async_zulip import AsyncClient
-from .commands import CommandInvocation, CommandParser, CommandSpec
+from .commands import CommandInvocation, CommandParser, CommandSpec, CommandArgument
 from .storage import BotStorage
 from .permissions import PermissionPolicy
 from .config import BotLocalConfig, load_bot_local_config, save_bot_local_config
@@ -82,10 +82,18 @@ class BaseBot(abc.ABC):
         try:
             mod = importlib.import_module(self.__class__.__module__)
             mod_file = inspect.getfile(mod)
-            default_path = str(Path(mod_file).parent / "bot.yaml")
+            default_path = Path(mod_file).parent / "bot.yaml"
         except Exception:
-            default_path = "bot.yaml"
+            logger.warning("Failed to determine bot module path, using ./bot.yaml for settings")
+            default_path = Path("bot.yaml")
         # Load settings
+        if not default_path.exists():
+            logger.info(f"No bot settings file found at {default_path}, using defaults.")
+            self.settings = BotLocalConfig(owner_user_id=-1)
+            self._settings_path = default_path  # type: ignore[attr-defined]
+            await self.save_settings()  # Save default config
+            logger.info(f"Created default bot settings at {default_path}")
+            return
         self.settings = load_bot_local_config(default_path)
         self._settings_path = default_path  # type: ignore[attr-defined]
         logger.info(f"Loaded bot settings from {default_path}")
@@ -134,6 +142,21 @@ class BaseBot(abc.ABC):
                 handler=self._handle_whoami,
             )
         )
+        # Permissions management command (restricted by min_level)
+        default_levels = (self.settings.role_levels if self.settings else {"user": 1, "admin": 50, "owner": 100, "bot_owner": 200})
+        self.command_parser.register_spec(
+            CommandSpec(
+                name="perm",
+                description="Manage bot permissions",
+                args=[
+                    CommandArgument("action", str, required=True),
+                    CommandArgument("arg1", str, required=False),
+                    CommandArgument("arg2", str, required=False),
+                ],
+                handler=self._handle_perm,
+                min_level=default_levels.get("bot_owner", 200),
+            )
+        )
         # Hook for subclasses
         self.register_commands()
 
@@ -178,13 +201,101 @@ class BaseBot(abc.ABC):
         )
         await self.send_reply(message, text)
 
+    async def _handle_perm(self, invocation: CommandInvocation, message: Message, bot: "BaseBot") -> None:
+        action = (invocation.args.get("action") or "").lower()
+        arg1 = invocation.args.get("arg1")
+        arg2 = invocation.args.get("arg2")
+
+        def ok(msg: str) -> str:
+            return f"✅ {msg}"
+
+        def err(msg: str) -> str:
+            return f"❌ {msg}"
+
+        if action == "set_owner":
+            if not arg1:
+                await self.send_reply(message, err("Usage: !perm set_owner <user_id>"))
+                return
+            try:
+                new_owner = int(arg1)
+            except Exception:
+                await self.send_reply(message, err("Invalid user_id"))
+                return
+            if not self.settings:
+                self.settings = BotLocalConfig()
+            self.settings.owner_user_id = new_owner
+            await self.save_settings()
+            await self.send_reply(message, ok(f"Bot owner set to {new_owner}"))
+            return
+
+        if action == "roles_show":
+            role_levels = (self.settings.role_levels if self.settings else {"user": 1, "admin": 50, "owner": 100, "bot_owner": 200})
+            lines = [f"{k}: {v}" for k, v in sorted(role_levels.items(), key=lambda kv: kv[1])]
+            await self.send_reply(message, "Current role levels:\n" + "\n".join(lines))
+            return
+
+        if action == "roles_set":
+            if not arg1 or not arg2:
+                await self.send_reply(message, err("Usage: !perm roles_set <role> <level>"))
+                return
+            role = str(arg1)
+            try:
+                level = int(arg2)
+            except Exception:
+                await self.send_reply(message, err("Invalid level"))
+                return
+            if not self.settings:
+                self.settings = BotLocalConfig()
+            self.settings.role_levels[role] = level
+            await self.save_settings()
+            await self.send_reply(message, ok(f"Role '{role}' level set to {level}"))
+            return
+
+        if action == "allow_stop":
+            if not arg1:
+                await self.send_reply(message, err("Usage: !perm allow_stop <user_id>"))
+                return
+            try:
+                uid = int(arg1)
+            except Exception:
+                await self.send_reply(message, err("Invalid user_id"))
+                return
+            acl = []
+            if self.storage:
+                acl = await self.storage.get("acl.stop", [])
+                if uid not in acl:
+                    acl.append(uid)
+                    await self.storage.put("acl.stop", acl)
+            await self.send_reply(message, ok(f"User {uid} allowed to stop bot"))
+            return
+
+        if action == "deny_stop":
+            if not arg1:
+                await self.send_reply(message, err("Usage: !perm deny_stop <user_id>"))
+                return
+            try:
+                uid = int(arg1)
+            except Exception:
+                await self.send_reply(message, err("Invalid user_id"))
+                return
+            acl = []
+            if self.storage:
+                acl = await self.storage.get("acl.stop", [])
+                acl = [x for x in acl if x != uid]
+                await self.storage.put("acl.stop", acl)
+            await self.send_reply(message, ok(f"User {uid} denied to stop bot"))
+            return
+
+        await self.send_reply(message, err("Unknown action. Use: set_owner | roles_show | roles_set | allow_stop | deny_stop"))
+
     async def on_start(self) -> None:
         """Hook for startup logic. Override if needed."""
         return None
 
     async def on_stop(self) -> None:
         """Hook for cleanup logic. Override if needed."""
-        return None
+        await self.save_settings()
+        logger.info("Bot stopped")
 
     async def on_event(self, event: Event) -> None:
         if event.type == "message" and event.message is not None:
@@ -201,6 +312,12 @@ class BaseBot(abc.ABC):
 
             if command_invocation is not None:
                 try:
+                    spec = command_invocation.spec
+                    if spec and getattr(spec, "min_level", None) is not None:
+                        user_level = await self._compute_user_level(event.message.sender_id)
+                        if user_level < spec.min_level:  # type: ignore[attr-defined]
+                            await self.send_reply(event.message, "❌ Permission denied.")
+                            return
                     await self.command_parser.dispatch(command_invocation, message=event.message, bot=self)
                 except Exception as exc:
                     logger.warning(f"Command dispatch failed: {exc}")
@@ -236,6 +353,20 @@ class BaseBot(abc.ABC):
             payload = StreamMessageRequest(to=original.stream_id, topic=topic, content=content)
 
         await self.client.send_message(payload.model_dump(exclude_none=True))
+
+    async def _compute_user_level(self, user_id: int) -> int:
+        role_levels = (self.settings.role_levels if self.settings else {"user": 1, "admin": 50, "owner": 100, "bot_owner": 200})
+        level = role_levels.get("user", 1)
+        if self.settings and self.settings.owner_user_id and user_id == self.settings.owner_user_id:
+            level = max(level, role_levels.get("bot_owner", 200))
+        try:
+            if self.perms and await self.perms.is_owner(user_id):
+                level = max(level, role_levels.get("owner", 100))
+            elif self.perms and await self.perms.is_admin(user_id):
+                level = max(level, role_levels.get("admin", 50))
+        except Exception:
+            pass
+        return level
 
 
 __all__ = ["BaseBot"]

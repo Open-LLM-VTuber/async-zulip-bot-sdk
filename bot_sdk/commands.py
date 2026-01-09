@@ -41,6 +41,8 @@ class CommandSpec:
     allow_extra: bool = False
     handler: Optional[Callable[["CommandInvocation", Any, Any], Awaitable[None] | None]] = None
     show_in_help: bool = True
+    # Minimum permission level required to execute this command (optional)
+    min_level: Optional[int] = None
 
 
 @dataclass

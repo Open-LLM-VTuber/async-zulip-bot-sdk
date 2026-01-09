@@ -220,3 +220,5 @@ dev_bot/
 bots.yaml
 
 bot_data/
+
+bot.yaml

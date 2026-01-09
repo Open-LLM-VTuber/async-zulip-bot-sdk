@@ -4,6 +4,8 @@ from typing import Any, List, Optional
 
 from ruamel.yaml import YAML
 from pydantic import BaseModel, Field
+from pathlib import Path
+
 
 class BotConfig(BaseModel):
     name: str
@@ -18,7 +20,7 @@ class AppConfig(BaseModel):
     bots: List[BotConfig] = Field(default_factory=list)
 
 
-def load_config(path: str, model: type[BaseModel]) -> BaseModel:
+def load_config(path: str | Path, model: type[BaseModel]) -> BaseModel:
     yaml = YAML(typ="safe")
     with open(path, "r", encoding="utf-8") as f:
         data = yaml.load(f) or {}
@@ -46,17 +48,14 @@ class BotLocalConfig(BaseModel):
     settings: dict[str, Any] = Field(default_factory=dict)
 
 
-def load_bot_local_config(path: str) -> BotLocalConfig:
+def load_bot_local_config(path: str | Path) -> BotLocalConfig:
     yaml = YAML(typ="safe")
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = yaml.load(f) or {}
-    except FileNotFoundError:
-        data = {}
+    with open(path, "r", encoding="utf-8") as f:
+        data = yaml.load(f) or {}
     return BotLocalConfig.model_validate(data)
 
 
-def save_bot_local_config(path: str, config: BotLocalConfig) -> None:
+def save_bot_local_config(path: str | Path, config: BotLocalConfig) -> None:
     yaml = YAML()
     yaml.default_flow_style = False
     with open(path, "w", encoding="utf-8") as f:
