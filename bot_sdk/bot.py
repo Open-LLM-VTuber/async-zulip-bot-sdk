@@ -334,6 +334,20 @@ class BaseBot(abc.ABC):
         else:
             logger.warning("Stop requested but runner reference is missing; bot may keep running")
 
+    async def _compute_user_level(self, user_id: int) -> int:
+        role_levels = (self.settings.role_levels if self.settings else {"user": 1, "admin": 50, "owner": 100, "bot_owner": 200})
+        level = role_levels.get("user", 1)
+        if self.settings and self.settings.owner_user_id and user_id == self.settings.owner_user_id:
+            level = max(level, role_levels.get("bot_owner", 200))
+        try:
+            if self.perms and await self.perms.is_owner(user_id):
+                level = max(level, role_levels.get("owner", 100))
+            elif self.perms and await self.perms.is_admin(user_id):
+                level = max(level, role_levels.get("admin", 50))
+        except Exception:
+            pass
+        return level
+
     async def on_start(self) -> None:
         """Hook for startup logic. Override if needed."""
         return None
@@ -399,20 +413,6 @@ class BaseBot(abc.ABC):
             payload = StreamMessageRequest(to=original.stream_id, topic=topic, content=content)
 
         await self.client.send_message(payload.model_dump(exclude_none=True))
-
-    async def _compute_user_level(self, user_id: int) -> int:
-        role_levels = (self.settings.role_levels if self.settings else {"user": 1, "admin": 50, "owner": 100, "bot_owner": 200})
-        level = role_levels.get("user", 1)
-        if self.settings and self.settings.owner_user_id and user_id == self.settings.owner_user_id:
-            level = max(level, role_levels.get("bot_owner", 200))
-        try:
-            if self.perms and await self.perms.is_owner(user_id):
-                level = max(level, role_levels.get("owner", 100))
-            elif self.perms and await self.perms.is_admin(user_id):
-                level = max(level, role_levels.get("admin", 50))
-        except Exception:
-            pass
-        return level
 
 
 __all__ = ["BaseBot"]
