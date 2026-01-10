@@ -32,9 +32,12 @@ class AsyncRepository(Generic[ModelT]):
         return instance
 
     async def delete(self, pk: object) -> bool:
-        stmt = delete(self.model).where(self.model.id == pk)
-        result = await self.session.execute(stmt)
-        return result.rowcount > 0
+        instance = await self.get(pk)
+        if instance is None:
+            return False
+        await self.session.delete(instance)
+        await self.session.flush()
+        return True
 
     async def list(self, *, limit: int = 100, offset: int = 0) -> Sequence[ModelT]:
         stmt: Select[ModelT] = select(self.model).limit(limit).offset(offset)
