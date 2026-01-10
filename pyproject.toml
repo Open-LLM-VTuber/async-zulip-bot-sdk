@@ -6,9 +6,11 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "aiosqlite>=0.20.0",
+    "alembic>=1.13.0",
     "distro>=1.9.0",
     "httpx>=0.28.1",
     "loguru>=0.7.3",
     "pydantic>=2.12.5",
+    "sqlalchemy>=2.0.0",
     "ruamel-yaml>=0.19.1",
 ]

@@ -29,6 +29,18 @@ from .models import (
     UpdatePresenceRequest,
     GetUserGroupsRequest,
 	GetUserGroupsResponse,
+    DataModel,
+    Timestamped,
+    IDModel,
+    SoftDelete,
+)
+from .db import (
+    Base,
+    make_sqlite_url,
+    create_engine,
+    create_sessionmaker,
+    session_scope,
+    AsyncRepository,
 )
 
 __all__ = [
@@ -61,4 +73,14 @@ __all__ = [
 	"GetUserGroupsResponse",
     "Validator",
 	"OptionValidator",
+	"DataModel",
+	"Timestamped",
+	"IDModel",
+	"SoftDelete",
+	"Base",
+	"make_sqlite_url",
+	"create_engine",
+	"create_sessionmaker",
+	"session_scope",
+	"AsyncRepository",
 ]
