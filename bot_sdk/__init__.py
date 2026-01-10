@@ -14,6 +14,7 @@ from .commands import (
 from .runner import BotRunner
 from .logging import setup_logging
 from .storage import BotStorage, CachedStorage
+from .config import StorageConfig
 from .models import (
 	Event,
 	EventsResponse,
@@ -29,6 +30,18 @@ from .models import (
     UpdatePresenceRequest,
     GetUserGroupsRequest,
 	GetUserGroupsResponse,
+    DataModel,
+    Timestamped,
+    IDModel,
+    SoftDelete,
+)
+from .db import (
+    Base,
+    make_sqlite_url,
+    create_engine,
+    create_sessionmaker,
+    session_scope,
+    AsyncRepository,
 )
 
 __all__ = [
@@ -45,6 +58,7 @@ __all__ = [
 	"setup_logging",
 	"BotStorage",
 	"CachedStorage",
+    "StorageConfig",
 	"Event",
 	"EventsResponse",
 	"Message",
@@ -61,4 +75,14 @@ __all__ = [
 	"GetUserGroupsResponse",
     "Validator",
 	"OptionValidator",
+	"DataModel",
+	"Timestamped",
+	"IDModel",
+	"SoftDelete",
+	"Base",
+	"make_sqlite_url",
+	"create_engine",
+	"create_sessionmaker",
+	"session_scope",
+	"AsyncRepository",
 ]

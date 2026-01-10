@@ -7,6 +7,21 @@ from pydantic import BaseModel, Field
 from pathlib import Path
 
 
+class StorageConfig(BaseModel):
+    """Per-bot storage options for KV backend.
+
+    auto_cache: enable always-on cache with periodic flush
+    auto_flush_interval: seconds between flush attempts
+    auto_flush_retry: retry delay after a flush failure (e.g., DB locked)
+    auto_flush_max_retries: max retries per key per flush cycle
+    """
+
+    auto_cache: bool = False
+    auto_flush_interval: float = 5.0
+    auto_flush_retry: float = 1.0
+    auto_flush_max_retries: int = 3
+
+
 class BotConfig(BaseModel):
     name: str
     module: Optional[str] = None
@@ -15,6 +30,7 @@ class BotConfig(BaseModel):
     zuliprc: Optional[str] = None
     event_types: list[str] = Field(default_factory=lambda: ["message"])
     config: dict[str, Any] = Field(default_factory=dict)
+    storage: Optional[StorageConfig] = None
 
 
 class AppConfig(BaseModel):
@@ -66,6 +82,7 @@ def save_bot_local_config(path: str | Path, config: BotLocalConfig) -> None:
 __all__ = [
     "AppConfig",
     "BotConfig",
+    "StorageConfig",
     "load_config",
     "BotLocalConfig",
     "load_bot_local_config",
