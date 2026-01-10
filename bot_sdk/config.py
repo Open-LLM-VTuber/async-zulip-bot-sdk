@@ -13,6 +13,7 @@ class BotConfig(BaseModel):
     class_name: Optional[str] = None
     enabled: bool = True
     zuliprc: Optional[str] = None
+    event_types: list[str] = Field(default_factory=lambda: ["message"])
     config: dict[str, Any] = Field(default_factory=dict)
 
 

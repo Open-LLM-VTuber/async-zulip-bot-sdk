@@ -16,6 +16,7 @@ from bot_sdk.config import AppConfig, load_config
 class BotSpec:
     factory: Callable[[Any], BaseBot]
     zuliprc: str
+    event_types: List[str]
 
 
 def discover_bot_factories(config: AppConfig, bots_dir: str = "bots") -> List[BotSpec]:
@@ -41,7 +42,13 @@ def discover_bot_factories(config: AppConfig, bots_dir: str = "bots") -> List[Bo
         zuliprc_path = Path(bot_cfg.zuliprc or base_path / bot_cfg.name / "zuliprc")
         if not zuliprc_path.exists():
             raise FileNotFoundError(f"zuliprc not found for bot {bot_cfg.name}: {zuliprc_path}")
-        specs.append(BotSpec(factory=_bind_factory(factory, bot_cfg.config), zuliprc=str(zuliprc_path)))
+        specs.append(
+            BotSpec(
+                factory=_bind_factory(factory, bot_cfg.config),
+                zuliprc=str(zuliprc_path),
+                event_types=bot_cfg.event_types,
+            )
+        )
     return specs
 
 
@@ -73,7 +80,7 @@ def _extract_factory(module, class_name: Optional[str] = None) -> Optional[Calla
 
 async def run_all_bots(bot_specs: Iterable[BotSpec]) -> None:
     runners = [
-        BotRunner(spec.factory, client_kwargs={"config_file": spec.zuliprc}, event_types=["message"])
+        BotRunner(spec.factory, client_kwargs={"config_file": spec.zuliprc}, event_types=spec.event_types)
         for spec in bot_specs
     ]
 

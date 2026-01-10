@@ -189,7 +189,7 @@ class BaseBot(abc.ABC):
         except Exception:
             logger.warning("Failed to save bot settings")
 
-    async def _handle_whoami(self, invocation: CommandInvocation, message: Message, bot: "BaseBot") -> None:
+    async def _handle_whoami(self, invocation: CommandInvocation, message: Message, bot: BaseBot) -> None:
         """Show permission-related info for the caller."""
         user_id = message.sender_id
         # Determine level by config priorities
@@ -217,7 +217,7 @@ class BaseBot(abc.ABC):
         )
         await self.send_reply(message, text)
 
-    async def _handle_perm(self, invocation: CommandInvocation, message: Message, bot: "BaseBot") -> None:
+    async def _handle_perm(self, invocation: CommandInvocation, message: Message, bot: BaseBot) -> None:
         action = (invocation.args.get("action") or "").lower()
         arg1 = invocation.args.get("arg1")
         arg2 = invocation.args.get("arg2")
@@ -358,8 +358,12 @@ class BaseBot(abc.ABC):
         await self.save_settings()
 
     async def on_event(self, event: Event) -> None:
+        """Main event handler. Default implementation dispatches commands and messages.
+        
+        Override to handle other event types or customize behavior.
+        But remember to call super().on_event(event) to retain command/message handling.
+        """
         if event.type == "message" and event.message is not None:
-            logger.debug(f"Received message: {event.message}")
             if event.message.sender_id == self._user_id:
                 logger.debug("Ignoring message from self")
                 return  # Ignore messages from ourselves
@@ -372,6 +376,7 @@ class BaseBot(abc.ABC):
 
             if command_invocation is not None:
                 try:
+                    logger.debug(f"Dispatching command: {command_invocation.name} with args {command_invocation.args}")
                     spec = command_invocation.spec
                     if spec and getattr(spec, "min_level", None) is not None:
                         user_level = await self._compute_user_level(event.message.sender_id)
@@ -383,6 +388,7 @@ class BaseBot(abc.ABC):
                     logger.warning(f"Command dispatch failed: {exc}")
                     await self.send_reply(event.message, f"Command error: {exc}")
             else:
+                logger.debug(f"Received message: {event.message}")
                 await self.on_message(event.message)
 
     @abc.abstractmethod
