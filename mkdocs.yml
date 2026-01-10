@@ -1,7 +1,7 @@
 site_name: async-zulip-bot-sdk
 site_description: "Async Zulip Bot SDK documentation"
-# 如果你以后想配置自定义域名，可以在这里加 site_url
-# site_url: https://<your-username>.github.io/<your-repo>
+site_url: https://docs.llmvtuber.com/async-zulip-bot-sdk/
+repo_url: https://github.com/Open-LLM-VTuber/async-zulip-bot-sdk/
 
 docs_dir: docs
 site_dir: site
