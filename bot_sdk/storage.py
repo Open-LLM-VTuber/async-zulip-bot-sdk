@@ -65,7 +65,8 @@ class BotStorage:
 
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
-        async with self._connect() as db:
+        db = await self._connect()
+        try:
             await db.execute(
                 """
                 CREATE TABLE IF NOT EXISTS bot_storage (
@@ -83,6 +84,8 @@ class BotStorage:
                 """
             )
             await db.commit()
+        finally:
+            await db.close()
 
         self._initialized = True
         logger.debug(f"Initialized storage at {self.db_path} with namespace '{self.namespace}'")
@@ -230,7 +233,8 @@ class BotStorage:
     async def _put_direct(self, key: str, value: Any) -> None:
         serialized = self._marshal(value)
 
-        async with self._connect() as db:
+        db = await self._connect()
+        try:
             await db.execute(
                 """
                 INSERT INTO bot_storage (namespace, key, value)
@@ -240,16 +244,21 @@ class BotStorage:
                 (self.namespace, key, serialized),
             )
             await db.commit()
+        finally:
+            await db.close()
 
         logger.trace(f"Storage [{self.namespace}]: put('{key}', ...)")
 
     async def _get_direct(self, key: str) -> Any:
-        async with self._connect() as db:
+        db = await self._connect()
+        try:
             async with db.execute(
                 "SELECT value FROM bot_storage WHERE namespace = ? AND key = ?",
                 (self.namespace, key),
             ) as cursor:
                 row = await cursor.fetchone()
+        finally:
+            await db.close()
 
         if row is None:
             return None
@@ -259,39 +268,51 @@ class BotStorage:
         return value
 
     async def _contains_direct(self, key: str) -> bool:
-        async with self._connect() as db:
+        db = await self._connect()
+        try:
             async with db.execute(
                 "SELECT 1 FROM bot_storage WHERE namespace = ? AND key = ? LIMIT 1",
                 (self.namespace, key),
             ) as cursor:
                 row = await cursor.fetchone()
+        finally:
+            await db.close()
         return row is not None
 
     async def _delete_direct(self, key: str) -> bool:
-        async with self._connect() as db:
+        db = await self._connect()
+        try:
             cursor = await db.execute(
                 "DELETE FROM bot_storage WHERE namespace = ? AND key = ?",
                 (self.namespace, key),
             )
             await db.commit()
             return cursor.rowcount > 0
+        finally:
+            await db.close()
 
     async def _keys_direct(self) -> List[str]:
-        async with self._connect() as db:
+        db = await self._connect()
+        try:
             async with db.execute(
                 "SELECT key FROM bot_storage WHERE namespace = ?",
                 (self.namespace,),
             ) as cursor:
                 rows = await cursor.fetchall()
+        finally:
+            await db.close()
         return [row[0] for row in rows]
 
     async def _clear_direct(self) -> None:
-        async with self._connect() as db:
+        db = await self._connect()
+        try:
             await db.execute(
                 "DELETE FROM bot_storage WHERE namespace = ?",
                 (self.namespace,),
             )
             await db.commit()
+        finally:
+            await db.close()
 
     @asynccontextmanager
     async def cached(self, keys: Optional[List[str]] = None):

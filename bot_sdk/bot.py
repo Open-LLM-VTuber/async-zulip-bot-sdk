@@ -1,17 +1,19 @@
 from __future__ import annotations
 
 import abc
-from typing import Optional, TYPE_CHECKING
 import importlib
 import inspect
+from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING, AsyncIterator, Optional
+
 from loguru import logger
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from .async_zulip import AsyncClient
-from .commands import CommandInvocation, CommandParser, CommandSpec, CommandArgument
-from .storage import BotStorage
-from .permissions import PermissionPolicy
+from .commands import CommandArgument, CommandInvocation, CommandParser, CommandSpec
 from .config import BotLocalConfig, StorageConfig, load_bot_local_config, save_bot_local_config
+from .db.database import create_engine, create_sessionmaker, make_sqlite_url, session_scope
 from .models import (
     Event,
     Message,
@@ -19,6 +21,8 @@ from .models import (
     StreamMessageRequest,
     UpdatePresenceRequest
 )
+from .permissions import PermissionPolicy
+from .storage import BotStorage
 
 if TYPE_CHECKING:  # pragma: no cover - type-only import to avoid cycles
     from .runner import BotRunner
@@ -34,10 +38,16 @@ class BaseBot(abc.ABC):
     enable_mention_commands = True
     # Whether to auto-register the built-in help command.
     auto_help_command = True
-    # Storage configuration
+    # Storage configuration (KV-based)
     enable_storage = True
     storage_path: Optional[str] = None  # Defaults to "bot_data/{bot_name}.db"
     storage_config: Optional[StorageConfig] = None
+
+    # ORM configuration (SQLAlchemy-based)
+    # Disabled by default; enable per-bot by setting enable_orm = True
+    enable_orm: bool = False
+    # By default, ORM DB path is resolved as "bot_data/<bot_module_dir>.sqlite"
+    orm_db_path: Optional[str] = None
 
     def __init__(self, client: AsyncClient) -> None:
         self.client = client
@@ -50,6 +60,9 @@ class BaseBot(abc.ABC):
         self.settings: Optional[BotLocalConfig] = None
         self.perms: Optional[PermissionPolicy] = None
         self._runner: Optional["BotRunner"] = None
+        # ORM engine/session factory (initialized only when enable_orm is True)
+        self._orm_engine: Optional[AsyncEngine] = None
+        self._orm_session_factory: Optional[async_sessionmaker[AsyncSession]] = None
         logger.debug(f"Initialized bot {self.__class__.__name__}")
 
     def set_runner(self, runner: "BotRunner") -> None:
@@ -69,6 +82,7 @@ class BaseBot(abc.ABC):
         - set_presence: update active presence
         """
         await self._init_storage()
+        await self._init_orm()
         await self._load_settings()
         await self._load_identity()
         await self._set_presence()
@@ -93,6 +107,41 @@ class BaseBot(abc.ABC):
         logger.info(f"Initialized storage at {self.storage_path}")
         # Initialize permissions helper
         self.perms = PermissionPolicy(self.client, self.storage)
+
+    async def _init_orm(self) -> None:
+        """Initialize ORM engine/session if enabled.
+
+        By default, when KV storage is enabled, ORM reuses the same SQLite
+        database file as BotStorage so both live in a single DB with
+        coordinated WAL/locking settings.
+
+        If storage is disabled or a separate DB is desired, bots can set
+        ``orm_db_path`` explicitly. Otherwise a per-bot default path is
+        derived from the module directory name.
+        """
+
+        if not self.enable_orm:
+            return
+
+        if self.orm_db_path is None:
+            # Prefer sharing the KV storage file when enabled.
+            if self.enable_storage and self.storage_path is not None:
+                self.orm_db_path = self.storage_path
+            else:
+                # Derive from module directory name when possible.
+                try:
+                    mod = importlib.import_module(self.__class__.__module__)
+                    mod_file = inspect.getfile(mod)
+                    bot_dir = Path(mod_file).parent
+                    db_name = bot_dir.name
+                except Exception:
+                    db_name = self.__class__.__name__.lower()
+                self.orm_db_path = f"bot_data/{db_name}.sqlite"
+
+        db_url = make_sqlite_url(self.orm_db_path)
+        logger.info(f"Initializing ORM database for {self.__class__.__name__} at {db_url}")
+        self._orm_engine = create_engine(db_url)
+        self._orm_session_factory = create_sessionmaker(self._orm_engine)
 
     async def _load_settings(self) -> None:
         """Load per-bot settings YAML next to the bot module by default."""
@@ -198,6 +247,31 @@ class BaseBot(abc.ABC):
             save_bot_local_config(self._settings_path, self.settings)
         except Exception:
             logger.warning("Failed to save bot settings")
+
+    @property
+    def orm_sessionmaker(self) -> async_sessionmaker[AsyncSession]:
+        """Return the ORM session factory.
+
+        Raises a RuntimeError if ORM is not enabled for this bot.
+        """
+
+        if not self._orm_session_factory:
+            raise RuntimeError("ORM is not enabled or not initialized for this bot")
+        return self._orm_session_factory
+
+    @asynccontextmanager
+    async def orm_session(self) -> AsyncIterator[AsyncSession]:
+        """Async context manager yielding an ORM session.
+
+        Example:
+            async with self.orm_session() as session:
+                ...
+        """
+
+        if not self._orm_session_factory:
+            raise RuntimeError("ORM is not enabled or not initialized for this bot")
+        async with session_scope(self._orm_session_factory) as session:
+            yield session
 
     async def _handle_whoami(self, invocation: CommandInvocation, message: Message, bot: BaseBot) -> None:
         """Show permission-related info for the caller."""
@@ -366,6 +440,12 @@ class BaseBot(abc.ABC):
         """Hook for cleanup logic. Override if needed."""
         logger.info("Bot stopping, performing cleanup...")
         await self.save_settings()
+        # Dispose ORM engine if it was initialized
+        if self._orm_engine is not None:
+            try:
+                await self._orm_engine.dispose()
+            except Exception:
+                logger.warning("Failed to dispose ORM engine cleanly")
 
     async def on_event(self, event: Event) -> None:
         """Main event handler. Default implementation dispatches commands and messages.
