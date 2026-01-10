@@ -199,6 +199,26 @@ async def on_start(self):
     )
 ```
 
+### 常驻自动缓存（通过 bots.yaml 配置）
+
+在 `bots.yaml` 为每个 bot 配置存储行为：
+
+```yaml
+bots:
+    - name: dev_bot
+        module: bots.dev_bot
+        class_name: TranslatorBot
+        storage:
+            auto_cache: true
+            auto_flush_interval: 5.0
+            auto_flush_retry: 1.0
+            auto_flush_max_retries: 3
+```
+
+- auto_cache 会保持内存缓存常驻，按间隔定期 flush。
+- flush 失败（SQLite 被 ORM 占用）会按重试间隔回退。
+- BotStorage 默认启用 WAL、`synchronous=NORMAL`、`busy_timeout=3000`，减轻锁竞争。
+
 ## 使用模式
 
 ### 计数器
@@ -322,6 +342,7 @@ class PollBot(BaseBot):
 - `contains()` 在缓存上下文中只检查缓存，不查数据库
 - 数据库文件默认存储在 `bot_data/` 目录
 - 所有数据自动 JSON 序列化，确保值是 JSON 兼容的
+- 如果需要 ORM 表，建议每个 bot 自己维护 Alembic 迁移目录，SDK 级迁移仅保留共享表。
 
 ## 相关文档
 
