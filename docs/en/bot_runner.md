@@ -23,14 +23,14 @@ runner = BotRunner(
 #### Parameters
 
 - **bot_factory**: Callable that returns a `BaseBot` when given an `AsyncClient`.
-- **event_types**: Event types to listen for (default `["message"]`).
+- **event_types**: Event types to listen for (default `["message"]`; configurable via `event_types` in `bots.yaml`).
 - **narrow**: Zulip narrow filters.
 - **client_kwargs**: Arguments forwarded to `AsyncClient`.
 
 ## Methods
 
 - **start()**: Create client, build bot, `post_init`, open session, `on_start`.
-- **stop()**: Call `on_stop`, close client.
+- **stop()**: Call `on_stop`, cancel long-poll, close client.
 - **run_forever()**: Poll events and dispatch indefinitely.
 
 ## Context manager

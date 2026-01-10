@@ -43,9 +43,12 @@ parser = CommandParser(prefixes=("/", "!", "#"), enable_mentions=True)
 
 - **register_spec(spec)**: Register a `CommandSpec`.
 - **parse_message(message)** → `CommandInvocation | None`.
-- **parse_text(text)** → `CommandInvocation` (raises on errors).
+- **parse_text(text)** → `CommandInvocation` (raises on errors; usage is included in argument errors).
 - **dispatch(invocation, message, bot)**: Call handler (awaits if coroutine).
-- **generate_help()** → str: Auto build help text.
+- **generate_help()** → str: Auto build help overview.
+- **Built-in help command**: Enabled by default. Usage:
+    - `!help` — list all commands
+    - `!help <command>` — show detailed usage, argument descriptions, aliases, min_level (if set)
 - **add_identity_aliases(full_name=None, email=None, extra=None)**: Add mention aliases for the bot identity.
 
 ## CommandSpec
@@ -63,6 +66,7 @@ CommandSpec(
     allow_extra: bool = False,
     handler: Callable | None = None,
     show_in_help: bool = True,
+    min_level: int | None = None,
 )
 ```
 
@@ -75,6 +79,7 @@ CommandSpec(
 - **allow_extra**: Allow extra tokens.
 - **handler**: Callable `(invocation, message, bot)`.
 - **show_in_help**: Show in generated help.
+- **min_level**: Optional minimum permission level; enforced by `BaseBot` before dispatch.
 
 ### Examples
 
@@ -104,6 +109,8 @@ CommandArgument(
 - **description**: Help text.
 - **multiple**: Capture remaining tokens as list.
 
+Argument `description` is surfaced in `!help <command>` detailed output.
+
 Boolean parsing accepts: `true/1/yes/y/on` and `false/0/no/n/off`.
 
 ## CommandInvocation
@@ -123,7 +130,7 @@ class CommandInvocation:
 
 - `CommandError`
 - `UnknownCommandError`
-- `InvalidArgumentsError`
+- `InvalidArgumentsError` (message includes Usage for quick fixes)
 
 ## Full example
 

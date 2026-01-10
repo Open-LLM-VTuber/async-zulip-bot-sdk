@@ -60,6 +60,14 @@ auto_help_command = True
 
 是否自动注册内置的 help 命令。默认为 `True`。
 
+### 内置命令
+
+- `whoami`：显示调用者的角色与权限等级。
+- `perm`：权限管理（设置 bot_owner、调整角色等级、允许/禁止 stop）。
+- `stop`：在具备权限时请求安全停止 BotRunner。
+
+> 权限校验：如果 `CommandSpec` 设置了 `min_level`，BaseBot 会在分发前检查；`perm`/`stop` 已内置限制。
+
 ## 实例属性
 
 ### client
@@ -167,7 +175,7 @@ async def on_event(self, event: Event) -> None
 1. 过滤 message 类型事件
 2. 忽略来自自己的消息
 3. 尝试解析命令
-4. 如果是命令，调用命令处理器
+4. 如果是命令，先校验 `min_level`（如设置），再调用命令处理器
 5. 否则调用 `on_message()`
 
 **重写示例**（处理其他事件类型）：

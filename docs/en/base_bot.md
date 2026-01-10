@@ -19,13 +19,18 @@ class MyBot(BaseBot):
 ```
 
 ## Class attributes
-
 - **command_prefixes**: Default (`"/", "!"`). Prefixes that trigger commands.
 - **enable_mention_commands**: Treat @-mentions as commands (default `True`).
 - **auto_help_command**: Auto-register built-in help command (default `True`).
 
-## Instance attributes
+Built-ins registered by default:
+- `whoami`: show caller roles/level.
+- `perm`: manage permissions (bot owner, role levels, allow/deny stop).
+- `stop`: request a graceful BotRunner shutdown (permission-checked).
 
+Permission enforcement: if a `CommandSpec` has `min_level`, BaseBot checks it before dispatch; `perm/stop` include built-in limits.
+
+## Instance attributes
 - **client**: The `AsyncClient` instance.
 - **command_parser**: The `CommandParser` instance.
 
@@ -37,7 +42,7 @@ class MyBot(BaseBot):
 
 ## Event handling
 
-- **on_event(event)**: Default handler. Parses commands, dispatches, or calls `on_message()`.
+- **on_event(event)**: Default handler. Parses commands, enforces `min_level` if present, then dispatches; otherwise calls `on_message()`.
 - **on_message(message)**: **Must implement**. Handle non-command messages.
 - **on_command(command, message)**: Legacy hook; prefer per-command handlers.
 

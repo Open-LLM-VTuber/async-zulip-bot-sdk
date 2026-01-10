@@ -127,20 +127,14 @@ await parser.dispatch(
 help_text = parser.generate_help() -> str
 ```
 
-生成帮助文本。
+生成概览帮助文本。
 
-**返回**: 格式化的帮助字符串
+#### 内置 help 命令（支持单条指令详情）
 
-**示例**：
-
-```python
-help_text = parser.generate_help()
-print(help_text)
-# 输出：
-# /greet <name> — 打招呼
-# /status — 显示状态
-# /help — 显示可用命令
-```
+- 默认自动注册 `help` 命令。
+- 用法：
+    - `!help`：显示所有命令概要
+    - `!help <command>`：显示指定指令的详细用法、参数描述、别名、最小权限（若设置）
 
 #### add_identity_aliases()
 
@@ -173,7 +167,7 @@ class CommandSpec:
     allow_extra: bool = False
     handler: Optional[Callable] = None
     show_in_help: bool = True
-```
+    min_level: Optional[int] = None
 
 ### 字段
 
@@ -184,6 +178,9 @@ class CommandSpec:
 - **allow_extra** (`bool`): 是否允许额外参数
 - **handler** (`Callable`): 命令处理函数
 - **show_in_help** (`bool`): 是否在帮助中显示
+- **min_level** (`int`, 可选): 最小权限等级；BaseBot 在分发前会校验
+
+参数的 `description` 字段会出现在 `!help <command>` 的详细帮助输出中。
 
 ### 示例
 
@@ -433,7 +430,7 @@ inv = CommandInvocation(
 
 - `CommandError`: 空命令或解析错误
 - `UnknownCommandError`: 未知命令
-- `InvalidArgumentsError`: 参数错误
+- `InvalidArgumentsError`: 参数错误（错误信息会包含 Usage，便于纠正）
 
 ```python
 try:

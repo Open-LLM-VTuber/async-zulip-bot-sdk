@@ -26,9 +26,11 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# MkDocs documentation
-/site/
-.cache/
+# Build output
+.fumadocs/
+out/
+.next/
+.vercel/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

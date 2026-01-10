@@ -23,7 +23,7 @@ runner = BotRunner(
 #### 参数
 
 - **bot_factory**: 工厂函数，接收 `AsyncClient` 返回 `BaseBot` 实例
-- **event_types**: 要监听的事件类型列表（默认 `["message"]`）
+- **event_types**: 要监听的事件类型列表（默认 `["message"]`，可在 `bots.yaml` 的 `event_types` 中配置）
 - **narrow**: 事件过滤条件
 - **client_kwargs**: 传递给 `AsyncClient` 的参数
 
@@ -81,7 +81,7 @@ await runner.stop()
 停止 Bot 并清理资源。执行以下步骤：
 
 1. 调用 `bot.on_stop()`
-2. 关闭 `AsyncClient`
+2. 取消长轮询任务，关闭 `AsyncClient`
 
 **示例**：
 

@@ -41,6 +41,7 @@ bots:
     email: echo-bot@example.com
     api_key: YOUR_API_KEY
     realm: https://chat.example.com
+    event_types: ["message", "reaction"]
 ```
 
 ## Validation tips
@@ -48,3 +49,4 @@ bots:
 - Ensure realm URL ends with scheme (`https://`).
 - Keep API keys secret; prefer env vars in CI.
 - Provide aliases matching how users mention the bot.
+- Set `event_types` when you need more than messages (e.g., `reaction`, `presence`, `typing`).

@@ -18,6 +18,7 @@ class BotConfig:
     class_name: Optional[str] = None
     enabled: bool = True
     zuliprc: Optional[str] = None
+  event_types: list[str] = Field(default_factory=list)
     config: dict[str, Any] = Field(default_factory=dict)
 ```
 
@@ -28,6 +29,7 @@ class BotConfig:
 - **class_name** (`str`, 可选): Bot 类名
 - **enabled** (`bool`): 是否启用（默认 `True`）
 - **zuliprc** (`str`, 可选): Zulip 配置文件路径
+- **event_types** (`List[str]`): 要订阅的事件类型（默认空，SDK 默认会用 ['message']）
 - **config** (`dict`): 自定义配置字典
 
 #### 示例
@@ -139,6 +141,7 @@ bots:
     class_name: EchoBot
     enabled: true
     zuliprc: ~/.zuliprc
+    event_types: ["message", "reaction"]
     config:
       prefix: "!"
       max_message_length: 1000
@@ -182,6 +185,7 @@ bots:
     class_name: MyBot
     enabled: true
     zuliprc: ~/.zuliprc
+    event_types: ["message"]
     config:
       debug: false
       timeout: 30
