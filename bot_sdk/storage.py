@@ -177,6 +177,8 @@ class BotStorage:
         await self._ensure_ready()
 
         if self._auto_cache:
+            if not await self.contains(key):
+                return False
             self._auto_cache.delete(key)
             return True
 
