@@ -157,9 +157,9 @@ class BaseBot(abc.ABC):
                 name="perm",
                 description="Manage bot permissions",
                 args=[
-                    CommandArgument("action", str, required=True),
-                    CommandArgument("arg1", str, required=False),
-                    CommandArgument("arg2", str, required=False),
+                    CommandArgument("action", str, required=True, description="Action: set_owner | roles_show | roles_set | allow_stop | deny_stop"),
+                    CommandArgument("arg1", str, required=False, description="First argument (user_id or role) depending on action"),
+                    CommandArgument("arg2", str, required=False, description="Second argument (level) for roles_set"),
                 ],
                 handler=self._handle_perm,
                 min_level=default_levels.get("bot_owner", 200),
