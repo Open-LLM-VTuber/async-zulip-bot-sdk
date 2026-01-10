@@ -8,6 +8,8 @@ from .commands import (
 	CommandSpec,
 	InvalidArgumentsError,
 	UnknownCommandError,
+	OptionValidator,
+    Validator,
 )
 from .runner import BotRunner
 from .logging import setup_logging
@@ -57,4 +59,6 @@ __all__ = [
 	"User",
     "GetUserGroupsRequest",
 	"GetUserGroupsResponse",
+    "Validator",
+	"OptionValidator",
 ]

@@ -31,6 +31,66 @@ class SupportsSendReply(Protocol):
         ...
 
 
+class Validator(Protocol):
+    """Callable validator that may coerce or reject a value."""
+
+    def __call__(self, value: Any) -> Any:
+        ...
+
+    def help_hint(self) -> Optional[str]:  # optional, but recommended
+        ...
+
+
+class OptionValidator:
+    """Ensure a value is one of the allowed options (useful for enums).
+
+    By default the match is case-sensitive. Set ``case_insensitive`` to allow
+    case-insensitive string comparison while still returning the original
+    value.
+    """
+
+    def __init__(self, options: Iterable[Any], *, case_insensitive: bool = False) -> None:
+        opts = list(options)
+        if not opts:
+            raise ValueError("options must not be empty")
+        self.options = opts
+        self.case_insensitive = case_insensitive
+        if case_insensitive:
+            self._normalized_map = {self._normalize(opt): opt for opt in opts}
+        else:
+            self._allowed = set(opts)
+
+    def __call__(self, value: Any) -> Any:
+        if self.case_insensitive and isinstance(value, str):
+            normalized = self._normalize(value)
+            if normalized in self._normalized_map:
+                return self._normalized_map[normalized]
+            self._raise_error(value)
+
+        if not self.case_insensitive:
+            if value in self._allowed:
+                return value
+            self._raise_error(value)
+
+        # If case-insensitive but the value is not a string, fall back to direct membership.
+        if value in self.options:
+            return value
+        self._raise_error(value)
+
+    def _raise_error(self, value: Any) -> None:
+        choices = ", ".join(str(opt) for opt in self.options)
+        raise ValueError(f"Value must be one of: {choices} (got {value})")
+
+    @staticmethod
+    def _normalize(value: Any) -> str:
+        return str(value).lower()
+
+    def help_hint(self) -> str:
+        choices = ", ".join(str(opt) for opt in self.options)
+        suffix = " (case-insensitive)" if self.case_insensitive else ""
+        return f"options: {choices}{suffix}"
+
+
 @dataclass
 class CommandArgument:
     name: str
@@ -38,6 +98,7 @@ class CommandArgument:
     required: bool = True
     description: str = ""
     multiple: bool = False  # capture the remainder of args
+    validator: Optional[Validator] = None
 
 
 @dataclass
@@ -190,9 +251,17 @@ class CommandParser:
     def _convert_value(self, value: str, arg_spec: CommandArgument) -> ArgType:
         target = arg_spec.type
         try:
+            converted: ArgType
             if target is bool:
-                return self._to_bool(value)
-            return target(value)
+                converted = self._to_bool(value)
+            else:
+                converted = target(value)
+
+            if arg_spec.validator is not None:
+                return arg_spec.validator(converted)
+            return converted
+        except InvalidArgumentsError:
+            raise
         except Exception as exc:  # pragma: no cover - simple conversion guard
             raise InvalidArgumentsError(arg_spec.name, f"Invalid value for {arg_spec.name}: {value}") from exc
 
@@ -263,10 +332,26 @@ class CommandParser:
                 requirement = "required" if arg.required else "optional"
                 multi = " (multiple)" if arg.multiple else ""
                 desc = f" - {arg.name}: {requirement}{multi}"
+                validator_hint = self._format_validator_hint(arg.validator)
                 if arg.description:
                     desc += f" — {arg.description}"
+                if validator_hint:
+                    desc += f" [{validator_hint}]"
                 lines.append(desc)
         return "\n".join(lines)
+
+    @staticmethod
+    def _format_validator_hint(validator: Optional[Validator]) -> str:
+        if validator is None:
+            return ""
+        hint_fn = getattr(validator, "help_hint", None)
+        if callable(hint_fn):
+            try:
+                hint = hint_fn()
+                return str(hint) if hint else ""
+            except Exception:  # pragma: no cover - help rendering should not break help
+                return ""
+        return f"validated by {validator.__class__.__name__}"
 
 
 __all__ = [
@@ -277,4 +362,6 @@ __all__ = [
     "CommandError",
     "UnknownCommandError",
     "InvalidArgumentsError",
+    "Validator",
+    "OptionValidator",
 ]
