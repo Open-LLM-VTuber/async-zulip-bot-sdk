@@ -14,6 +14,7 @@ from .commands import (
 from .runner import BotRunner
 from .logging import setup_logging
 from .storage import BotStorage, CachedStorage
+from .config import StorageConfig
 from .models import (
 	Event,
 	EventsResponse,
@@ -57,6 +58,7 @@ __all__ = [
 	"setup_logging",
 	"BotStorage",
 	"CachedStorage",
+    "StorageConfig",
 	"Event",
 	"EventsResponse",
 	"Message",

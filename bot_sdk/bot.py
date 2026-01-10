@@ -11,7 +11,7 @@ from .async_zulip import AsyncClient
 from .commands import CommandInvocation, CommandParser, CommandSpec, CommandArgument
 from .storage import BotStorage
 from .permissions import PermissionPolicy
-from .config import BotLocalConfig, load_bot_local_config, save_bot_local_config
+from .config import BotLocalConfig, StorageConfig, load_bot_local_config, save_bot_local_config
 from .models import (
     Event,
     Message,
@@ -37,6 +37,7 @@ class BaseBot(abc.ABC):
     # Storage configuration
     enable_storage = True
     storage_path: Optional[str] = None  # Defaults to "bot_data/{bot_name}.db"
+    storage_config: Optional[StorageConfig] = None
 
     def __init__(self, client: AsyncClient) -> None:
         self.client = client
@@ -54,6 +55,10 @@ class BaseBot(abc.ABC):
     def set_runner(self, runner: "BotRunner") -> None:
         """Called by BotRunner to allow commands to signal runner actions."""
         self._runner = runner
+
+    def set_storage_config(self, storage_config: Optional[StorageConfig]) -> None:
+        """Inject per-bot storage configuration from runner/config layer."""
+        self.storage_config = storage_config
         
     async def post_init(self) -> None:
         """Hook for post-initialization logic. Override if needed.
@@ -76,9 +81,14 @@ class BaseBot(abc.ABC):
             return
         if self.storage_path is None:
             self.storage_path = f"bot_data/{bot_name}.db"
+        auto_cfg = self.storage_config or StorageConfig()
         self.storage = BotStorage(
             db_path=self.storage_path,
-            namespace=f"bot_{bot_name}"
+            namespace=f"bot_{bot_name}",
+            auto_cache=auto_cfg.auto_cache,
+            auto_flush_interval=auto_cfg.auto_flush_interval,
+            auto_flush_retry=auto_cfg.auto_flush_retry,
+            auto_flush_max_retries=auto_cfg.auto_flush_max_retries,
         )
         logger.info(f"Initialized storage at {self.storage_path}")
         # Initialize permissions helper

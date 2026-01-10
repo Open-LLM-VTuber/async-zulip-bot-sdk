@@ -10,6 +10,7 @@ from loguru import logger
 
 from bot_sdk import BaseBot, BotRunner, setup_logging
 from bot_sdk.config import AppConfig, load_config
+from bot_sdk.config import StorageConfig
 
 
 @dataclass
@@ -17,6 +18,7 @@ class BotSpec:
     factory: Callable[[Any], BaseBot]
     zuliprc: str
     event_types: List[str]
+    storage: Optional[StorageConfig]
 
 
 def discover_bot_factories(config: AppConfig, bots_dir: str = "bots") -> List[BotSpec]:
@@ -47,6 +49,7 @@ def discover_bot_factories(config: AppConfig, bots_dir: str = "bots") -> List[Bo
                 factory=_bind_factory(factory, bot_cfg.config),
                 zuliprc=str(zuliprc_path),
                 event_types=bot_cfg.event_types,
+                storage=bot_cfg.storage,
             )
         )
     return specs
@@ -80,7 +83,12 @@ def _extract_factory(module, class_name: Optional[str] = None) -> Optional[Calla
 
 async def run_all_bots(bot_specs: Iterable[BotSpec]) -> None:
     runners = [
-        BotRunner(spec.factory, client_kwargs={"config_file": spec.zuliprc}, event_types=spec.event_types)
+        BotRunner(
+            spec.factory,
+            client_kwargs={"config_file": spec.zuliprc},
+            event_types=spec.event_types,
+            storage_config=spec.storage,
+        )
         for spec in bot_specs
     ]
 

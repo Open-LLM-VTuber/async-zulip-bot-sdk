@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, Type
 from .async_zulip import AsyncClient
 from .bot import BaseBot
 from .logging import logger
+from .config import StorageConfig
 
 
 class BotRunner:
@@ -19,6 +20,7 @@ class BotRunner:
         narrow: Optional[List[List[str]]] = None,
         client_kwargs: Optional[Dict[str, Any]] = None,
         max_concurrency: int = 8,
+        storage_config: Optional[StorageConfig] = None,
     ) -> None:
         self.bot_factory = bot_factory
         self.event_types = event_types or ["message"]
@@ -31,6 +33,7 @@ class BotRunner:
         self._max_concurrency = max_concurrency
         self._stop_event = asyncio.Event()
         self._longpoll_task: Optional[asyncio.Task[None]] = None
+        self._storage_config = storage_config
 
     async def __aenter__(self) -> "BotRunner":
         await self.start()
@@ -42,6 +45,8 @@ class BotRunner:
     async def start(self) -> None:
         self.client = AsyncClient(**self.client_kwargs)
         self.bot = self.bot_factory(self.client)
+        if hasattr(self.bot, "set_storage_config"):
+            self.bot.set_storage_config(self._storage_config)
         # Give the bot a back-reference so commands can trigger runner-level actions (e.g., stop).
         if hasattr(self.bot, "set_runner"):
             self.bot.set_runner(self)
