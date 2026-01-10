@@ -6,6 +6,7 @@
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/Open-LLM-VTuber/async-zulip-bot-sdk)](https://github.com/Open-LLM-VTuber/async-zulip-bot-sdk/releases)
 
 [English](README.md) | [中文](README.zh-CN.md)
 
@@ -23,16 +24,25 @@
 
 ### 📦 安装
 
-1. 克隆本仓库
+自 **v0.2.0** 起，本项目通过 GitHub Actions 在发布 **GitHub Release** 时
+自动构建并发布到 **PyPI**，因此从该版本开始可以直接通过 `(uv)pip` 安装。
+
+#### 方式一：从 PyPI 安装（普通用户推荐）
 
 ```bash
-git https://github.com/Open-LLM-VTuber/async-zulip-bot-sdk.git
-cd async-zulip-bot-sdk
+# 使用 uv（推荐）
+uv pip install async-zulip-bot-sdk
+
+# 或直接使用 pip
+pip install async-zulip-bot-sdk
 ```
 
-2. 在本地环境中安装，在这之前推荐先新建一个虚拟环境
+#### 方式二：从源码安装（开发者推荐）
 
 ```bash
+git clone https://github.com/Open-LLM-VTuber/async-zulip-bot-sdk.git
+cd async-zulip-bot-sdk
+
 # 使用 uv（推荐）
 uv venv
 uv pip install -e .
@@ -230,7 +240,8 @@ async def on_message(self, message: Message):
 
 完整的 API 文档可在线访问：
 
-- **文件文档**：[/docs](/docs/)
+- **在线文档（推荐）**：https://docs.llmvtuber.com/async-zulip-bot-sdk/
+- **仓库内文档**：见 `docs/` 目录，可使用 `mkdocs serve` 在本地预览
 
 文档包括：
 - 📖 快速开始指南

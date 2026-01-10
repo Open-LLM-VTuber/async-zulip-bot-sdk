@@ -6,6 +6,7 @@
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/Open-LLM-VTuber/async-zulip-bot-sdk)](https://github.com/Open-LLM-VTuber/async-zulip-bot-sdk/releases)
 
 [English](README.md) | [中文](README.zh-CN.md)
 
@@ -16,16 +17,25 @@
 
 ### 📦 Installation
 
-1. Clone the repository
+From version **v0.2.0** and later, the SDK is published to **PyPI** via an
+automated GitHub Actions workflow whenever a GitHub release is created.
+
+#### Option 1: Install from PyPI (recommended for users)
+
+```bash
+# Using uv (recommended)
+uv pip install async-zulip-bot-sdk
+
+# Or using pip directly
+pip install async-zulip-bot-sdk
+```
+
+#### Option 2: Install from source (for development)
 
 ```bash
 git clone https://github.com/Open-LLM-VTuber/async-zulip-bot-sdk.git
 cd async-zulip-bot-sdk
-```
 
-2. Install in a virtual environment (recommended)
-
-```bash
 # Using uv (recommended)
 uv venv
 uv pip install -e .
@@ -224,7 +234,8 @@ async def on_message(self, message: Message):
 
 Comprehensive API documentation is available:
 
-- **File Docs**: [/docs/en](/docs/en/)
+- **Online Docs** (hosted): https://docs.llmvtuber.com/async-zulip-bot-sdk/
+- **Source Docs** (in this repo): see the `docs/` directory (build with `mkdocs serve`)
 
 Documentation includes:
 - 📖 Quick Start Guide
