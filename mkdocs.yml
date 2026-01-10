@@ -22,7 +22,6 @@ nav:
 
 theme:
   name: material
-  language: en
 
 markdown_extensions:
   - admonition
@@ -32,3 +31,26 @@ markdown_extensions:
 
 plugins:
   - search
+  - i18n:
+      docs_structure: folder
+      reconfigure_material: true
+      languages:
+        - locale: en
+          name: English
+          default: true
+          build: true
+        - locale: zh
+          name: 中文
+          build: true
+          nav_translations:
+            Home: 首页
+            Quickstart: 快速开始
+            Core: 核心组件
+            Async client: 异步客户端
+            Base bot: Bot 基类
+            Bot runner: Bot 运行器
+            Commands: 命令系统
+            Config: 配置
+            Logging: 日志
+            Models: 数据模型
+            Storage: 存储
