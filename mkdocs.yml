@@ -1,0 +1,34 @@
+site_name: async-zulip-bot-sdk
+site_description: "Async Zulip Bot SDK documentation"
+# 如果你以后想配置自定义域名，可以在这里加 site_url
+# site_url: https://<your-username>.github.io/<your-repo>
+
+docs_dir: docs
+site_dir: site
+
+nav:
+  - Home: README.md
+  - Quickstart: quickstart.md
+  - Core:
+      - Async client: async_client.md
+      - Base bot: base_bot.md
+      - Bot runner: bot_runner.md
+      - Commands: commands.md
+      - Config: config.md
+      - Core: core.md
+      - Logging: logging.md
+      - Models: models.md
+      - Storage: storage.md
+
+theme:
+  name: material
+  language: en
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - toc:
+      permalink: true
+
+plugins:
+  - search

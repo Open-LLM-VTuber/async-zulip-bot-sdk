@@ -1,21 +1,21 @@
 # Bot Storage
 
-轻量级 SQLite 存储，提供类似字典的接口，灵感来自 Zulip 官方 bot SDK。
+Lightweight SQLite-backed storage with a dict-like interface, inspired by the official Zulip bot SDK.
 
-## 特性
+## Features
 
-- ✅ **字典式接口**：`get()`, `put()`, `contains()` 等方法
-- ✅ **自动初始化**：无需手动创建数据库或表
-- ✅ **缓存机制**：通过 `cached()` 上下文管理器减少数据库 I/O
-- ✅ **JSON 序列化**：自动处理 Python 对象的序列化
-- ✅ **命名空间隔离**：多个 bot 可共享同一数据库文件
-- ✅ **完全异步**：基于 `aiosqlite`，不会阻塞事件循环
+- ✅ Dict-style interface: `get()`, `put()`, `contains()`, etc.
+- ✅ Auto-initialization: no manual database/table setup
+- ✅ Caching: `cached()` context manager to cut down DB I/O
+- ✅ JSON serialization: Python objects handled automatically
+- ✅ Namespace isolation: multiple bots can share one DB file safely
+- ✅ Fully async: built on `aiosqlite`, non-blocking for the event loop
 
-## 快速开始
+## Quickstart
 
-### 基础用法
+### Basic usage
 
-在 `BaseBot` 子类中，`self.storage` 自动可用：
+In a `BaseBot` subclass, `self.storage` is ready to use:
 
 ```python
 from bot_sdk import BaseBot
@@ -23,53 +23,53 @@ from bot_sdk.models import Message
 
 class MyBot(BaseBot):
     async def on_message(self, message: Message) -> None:
-        # 直接访问存储
+        # Directly access storage
         count = await self.storage.get("counter", 0)
         count += 1
         await self.storage.put("counter", count)
-        
+
         await self.send_reply(message, f"Count: {count}")
 ```
 
-### 使用缓存（推荐）
+### Using the cache (recommended)
 
-对于需要多次读写的场景，使用 `cached()` 可以显著减少数据库访问：
+For multiple reads/writes, `cached()` can dramatically reduce DB access:
 
 ```python
 async def on_message(self, message: Message) -> None:
-    # 使用缓存上下文管理器
+    # Use the cache context manager
     async with self.storage.cached(["counter", "users"]) as cache:
-        # 这些操作只访问内存缓存
+        # These operations hit the in-memory cache only
         counter = cache.get("counter", 0)
         users = cache.get("users", [])
-        
+
         counter += 1
         users.append(message.sender_id)
-        
+
         cache.put("counter", counter)
         cache.put("users", users)
-        # 退出时自动批量写入数据库
+        # Changes flush to the DB when exiting
 ```
 
-## API 参考
+## API Reference
 
 ### BotStorage
 
-#### 方法
+#### Methods
 
 ##### `async put(key: str, value: Any) -> None`
 
-存储键值对。值会被自动 JSON 序列化。
+Store a key-value pair. Values are JSON-serialized automatically.
 
 ```python
 await storage.put("name", "Alice")
-await storage.put("settings", {"theme": "dark", "lang": "zh"})
+await storage.put("settings", {"theme": "dark", "lang": "en"})
 await storage.put("count", 42)
 ```
 
 ##### `async get(key: str, default=None) -> Any`
 
-获取键对应的值，如果不存在返回 `default`。
+Get the value for a key, or return `default` if missing.
 
 ```python
 name = await storage.get("name")  # "Alice"
@@ -79,7 +79,7 @@ settings = await storage.get("settings")  # dict
 
 ##### `async contains(key: str) -> bool`
 
-检查键是否存在。
+Check whether a key exists.
 
 ```python
 if await storage.contains("user_id"):
@@ -88,7 +88,7 @@ if await storage.contains("user_id"):
 
 ##### `async delete(key: str) -> bool`
 
-删除键，返回是否删除成功。
+Delete a key and return whether the deletion succeeded.
 
 ```python
 deleted = await storage.delete("temp_data")
@@ -96,7 +96,7 @@ deleted = await storage.delete("temp_data")
 
 ##### `async keys() -> List[str]`
 
-获取当前命名空间下的所有键。
+List all keys under the current namespace.
 
 ```python
 all_keys = await storage.keys()
@@ -105,32 +105,32 @@ print(f"Stored keys: {all_keys}")
 
 ##### `async clear() -> None`
 
-清空当前命名空间的所有数据。
+Clear all data under the current namespace.
 
 ```python
-await storage.clear()  # 危险操作！
+await storage.clear()  # Dangerous!
 ```
 
 ##### `cached(keys: List[str] = None)`
 
-返回缓存上下文管理器。
+Return a caching context manager.
 
 ```python
 async with storage.cached(["key1", "key2"]) as cache:
-    # 使用 cache 代替 storage
+    # Use cache instead of storage
     val1 = cache.get("key1", 0)
     cache.put("key1", val1 + 1)
 ```
 
 ### CachedStorage
 
-在 `storage.cached()` 上下文中使用。
+Used inside `storage.cached()`.
 
-#### 方法
+#### Methods
 
 ##### `put(key: str, value: Any) -> None`
 
-存储到缓存（注意：**不是异步方法**）。
+Store into the cache (note: **not async**).
 
 ```python
 cache.put("key", "value")
@@ -138,7 +138,7 @@ cache.put("key", "value")
 
 ##### `get(key: str, default=None) -> Any`
 
-从缓存读取（注意：**不是异步方法**）。
+Read from the cache (note: **not async**).
 
 ```python
 value = cache.get("key", "default_value")
@@ -146,7 +146,7 @@ value = cache.get("key", "default_value")
 
 ##### `contains(key: str) -> bool`
 
-检查缓存中是否有该键（仅检查缓存，不查数据库）。
+Check if the cache has the key (cache only, no DB lookup).
 
 ```python
 if cache.contains("key"):
@@ -155,53 +155,53 @@ if cache.contains("key"):
 
 ##### `async flush_one(key: str) -> None`
 
-立即将某个键的更改写入数据库。
+Immediately persist a single cached key to the DB.
 
 ```python
 cache.put("important", data)
-await cache.flush_one("important")  # 立即持久化
+await cache.flush_one("important")  # Persist now
 ```
 
 ##### `async flush() -> None`
 
-将所有更改写入数据库。
+Persist all cached changes.
 
 ```python
-await cache.flush()  # 通常由上下文管理器自动调用
+await cache.flush()  # Usually called automatically by the context manager
 ```
 
-## 配置
+## Configuration
 
-### 自定义存储路径
-
-```python
-class MyBot(BaseBot):
-    storage_path = "data/my_bot.db"  # 自定义路径
-```
-
-### 禁用存储
+### Custom storage path
 
 ```python
 class MyBot(BaseBot):
-    enable_storage = False  # 禁用存储功能
+    storage_path = "data/my_bot.db"  # Custom path
 ```
 
-### 自定义序列化
+### Disable storage
+
+```python
+class MyBot(BaseBot):
+    enable_storage = False  # Turn off storage entirely
+```
+
+### Custom serialization
 
 ```python
 import pickle
 
 async def on_start(self):
-    # 使用 pickle 而不是 JSON
+    # Use pickle instead of JSON
     self.storage.set_marshal(
         marshal_fn=lambda obj: pickle.dumps(obj).hex(),
         demarshal_fn=lambda s: pickle.loads(bytes.fromhex(s))
     )
 ```
 
-## 使用模式
+## Usage patterns
 
-### 计数器
+### Counter
 
 ```python
 async with self.storage.cached(["counter"]) as cache:
@@ -209,7 +209,7 @@ async with self.storage.cached(["counter"]) as cache:
     cache.put("counter", count + 1)
 ```
 
-### 用户状态跟踪
+### User state tracking
 
 ```python
 async with self.storage.cached(["users"]) as cache:
@@ -221,24 +221,24 @@ async with self.storage.cached(["users"]) as cache:
     cache.put("users", users)
 ```
 
-### 配置管理
+### Config management
 
 ```python
-# 读取
+# Read
 config = await self.storage.get("config", {
     "lang": "en",
     "timezone": "UTC"
 })
 
-# 更新
-config["lang"] = "zh"
+# Update
+config["lang"] = "en"
 await self.storage.put("config", config)
 ```
 
-### 临时缓存
+### Ephemeral cache
 
 ```python
-# 存储带 TTL 的数据（需要自己管理过期）
+# Store data with a TTL (you manage expiry yourself)
 cache_data = await self.storage.get("cache", {})
 cache_data["key"] = {
     "value": "data",
@@ -247,17 +247,14 @@ cache_data["key"] = {
 await self.storage.put("cache", cache_data)
 ```
 
-## 性能建议
+## Performance tips
 
-1. **优先使用缓存上下文**：对于批量操作，使用 `cached()` 可以将多次数据库访问合并为 2 次（初始读取 + 最终写入）
+1. **Prefer the cache context**: For batch ops, `cached()` can collapse multiple DB hits into just two (initial load + final flush).
+2. **Prefetch critical keys**: Pass the keys you need to `cached()` to avoid cache misses.
+3. **Avoid huge objects**: SQLite fits small/medium data; put large blobs on the filesystem instead.
+4. **Clean up periodically**: Consider `delete()` for old records when appropriate.
 
-2. **预取关键数据**：在 `cached()` 中指定需要的键，避免缓存未命中
-
-3. **避免存储大对象**：SQLite 适合中小型数据，大文件应存到文件系统
-
-4. **定期清理**：对于历史数据，考虑定期 `delete()` 旧记录
-
-## 示例：完整的投票 Bot
+## Example: full poll bot
 
 ```python
 from bot_sdk import BaseBot
@@ -266,65 +263,65 @@ from bot_sdk.models import Message
 class PollBot(BaseBot):
     async def on_message(self, message: Message) -> None:
         content = message.content.strip()
-        
+
         if content.startswith("/poll "):
-            # 创建投票
+            # Create a poll
             question = content[6:].strip()
             async with self.storage.cached(["current_poll"]) as cache:
                 cache.put("current_poll", {
                     "question": question,
                     "votes": {"yes": 0, "no": 0}
                 })
-            await self.send_reply(message, f"📊 Poll: {question}\n/yes or /no to vote!")
-        
+            await self.send_reply(message, f"\ud83d\udcca Poll: {question}\n/yes or /no to vote!")
+
         elif content == "/yes" or content == "/no":
-            # 投票
+            # Vote
             async with self.storage.cached(["current_poll", "voters"]) as cache:
                 poll = cache.get("current_poll")
                 if not poll:
                     await self.send_reply(message, "No active poll!")
                     return
-                
+
                 voters = cache.get("voters", [])
                 if message.sender_id in voters:
                     await self.send_reply(message, "You already voted!")
                     return
-                
+
                 option = "yes" if content == "/yes" else "no"
                 poll["votes"][option] += 1
                 voters.append(message.sender_id)
-                
+
                 cache.put("current_poll", poll)
                 cache.put("voters", voters)
-            
-            await self.send_reply(message, f"✅ Voted {option}!")
-        
+
+            await self.send_reply(message, f"\u2705 Voted {option}!")
+
         elif content == "/results":
-            # 显示结果
+            # Show results
             poll = await self.storage.get("current_poll")
             if not poll:
                 await self.send_reply(message, "No active poll!")
                 return
-            
-            results = f"""
-📊 **{poll['question']}**
 
-👍 Yes: {poll['votes']['yes']}
-👎 No: {poll['votes']['no']}
+            results = f"""
+\ud83d\udcca **{poll['question']}**
+
+\ud83d\udc4d Yes: {poll['votes']['yes']}
+\ud83d\udc4e No: {poll['votes']['no']}
             """.strip()
             await self.send_reply(message, results)
 ```
 
-## 注意事项
+## Notes
 
-- 存储是按 bot 用户 ID 命名空间隔离的
-- `CachedStorage.get()` 和 `put()` 是同步方法（在缓存上下文中）
-- `contains()` 在缓存上下文中只检查缓存，不查数据库
-- 数据库文件默认存储在 `bot_data/` 目录
-- 所有数据自动 JSON 序列化，确保值是 JSON 兼容的
+- Storage is namespaced by bot user ID
+- `CachedStorage.get()` and `put()` are synchronous inside the cache context
+- `contains()` inside the cache context checks cache only (no DB hit)
+- DB files default to the `bot_data/` directory
+- All values are JSON-serialized automatically; keep values JSON-friendly
 
-## 相关文档
+## Related docs
 
 - [BaseBot API](base_bot.md)
-- [命令系统](commands.md)
-- [快速开始](quickstart.md)
+- [Command system](commands.md)
+- [Quickstart](quickstart.md)

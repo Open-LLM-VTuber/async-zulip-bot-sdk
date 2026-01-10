@@ -1,21 +1,21 @@
-# 快速开始
+# Quick Start
 
-本指南将帮助你快速创建并运行第一个 Zulip 机器人。
+This guide will help you quickly create and run your first Zulip bot.
 
-## 前置要求
+## Prerequisites
 
-- Python 3.8 或更高版本
-- 一个 Zulip 账户和 API 密钥
+- Python 3.8 or higher
+- A Zulip account and API key
 
-## 安装
+## Installation
 
 ```bash
 pip install async-zulip-bot-sdk
 ```
 
-## 配置 Zulip 凭据
+## Configure Zulip Credentials
 
-创建 `~/.zuliprc` 文件：
+Create a `~/.zuliprc` file:
 
 ```ini
 [api]
@@ -24,31 +24,31 @@ key=your-api-key
 site=https://your-zulip-server.com
 ```
 
-## 创建你的第一个 Bot
+## Create Your First Bot
 
-### 1. 基础 Echo Bot
+### 1. Basic Echo Bot
 
-创建 `my_bot.py`：
+Create `my_bot.py`:
 
 ```python
 from bot_sdk import BaseBot, Message, run_bot
 
 class EchoBot(BaseBot):
     async def on_message(self, message: Message) -> None:
-        """回显收到的消息"""
-        await self.send_reply(message, f"你说: {message.content}")
+        """Echo received messages"""
+        await self.send_reply(message, f"You said: {message.content}")
 
 if __name__ == "__main__":
     run_bot(EchoBot)
 ```
 
-运行：
+Run:
 
 ```bash
 python my_bot.py
 ```
 
-### 2. 带命令的 Bot
+### 2. Bot with Commands
 
 ```python
 from bot_sdk import BaseBot, Message, CommandSpec, CommandArgument
@@ -57,17 +57,17 @@ class CommandBot(BaseBot):
     def __init__(self, client):
         super().__init__(client)
         
-        # 注册命令
+        # Register commands
         self.command_parser.register_spec(
             CommandSpec(
                 name="greet",
-                description="向某人打招呼",
+                description="Greet someone",
                 args=[
                     CommandArgument(
                         name="name",
                         type=str,
                         required=True,
-                        description="要打招呼的人名"
+                        description="Name to greet"
                     )
                 ],
                 handler=self.handle_greet
@@ -75,92 +75,37 @@ class CommandBot(BaseBot):
         )
     
     async def handle_greet(self, invocation, message, bot):
-        """处理 greet 命令"""
+        """Handle greet command"""
         name = invocation.args["name"]
-        await self.send_reply(message, f"你好，{name}！👋")
+        await self.send_reply(message, f"Hello, {name}! 👋")
     
     async def on_message(self, message: Message) -> None:
-        """处理非命令消息"""
-        await self.send_reply(message, "使用 /help 查看可用命令")
+        """Handle non-command messages"""
+        await self.send_reply(message, "Use /help to see available commands")
 
 if __name__ == "__main__":
     run_bot(CommandBot)
 ```
 
-### 3. 使用多个 Bot
+## Next Steps
 
-创建 `bots.yaml`：
+- Check [BaseBot API](base_bot.md) to learn more about bot features
+- Read [Command System](commands.md) to learn how to build complex commands
+- Explore [AsyncClient API](async_client.md) to learn about all available Zulip APIs
 
-```yaml
-bots:
-  - name: echo_bot
-    module: my_bot
-    class_name: EchoBot
-    enabled: true
-    
-  - name: command_bot
-    module: my_bot
-    class_name: CommandBot
-    enabled: true
-```
+## FAQ
 
-创建 `main.py`：
+### How to test the bot?
 
-```python
-import asyncio
-from bot_sdk import BotRunner, AsyncClient
-from bot_sdk.config import load_config, AppConfig
-from my_bot import EchoBot, CommandBot
+Test your bot on a test server or in a private channel.
 
-async def main():
-    config = load_config("bots.yaml", AppConfig)
-    
-    runners = []
-    for bot_config in config.bots:
-        if not bot_config.enabled:
-            continue
-            
-        # 根据配置选择 Bot 类
-        if bot_config.class_name == "EchoBot":
-            bot_cls = EchoBot
-        elif bot_config.class_name == "CommandBot":
-            bot_cls = CommandBot
-        else:
-            continue
-        
-        runner = BotRunner(
-            lambda c: bot_cls(c),
-            client_kwargs={"config_file": bot_config.zuliprc or "~/.zuliprc"}
-        )
-        runners.append(runner)
-        await runner.start()
-    
-    # 运行所有 bot
-    await asyncio.gather(*[r.run_forever() for r in runners])
+### Bot not responding?
 
-if __name__ == "__main__":
-    asyncio.run(main())
-```
+1. Check if `.zuliprc` configuration is correct
+2. Confirm bot account has permission to access relevant channels
+3. Check log output for error messages
 
-## 下一步
-
-- 查看 [BaseBot API](base_bot.md) 了解更多 Bot 功能
-- 阅读 [命令系统](commands.md) 学习如何构建复杂命令
-- 探索 [AsyncClient API](async_client.md) 了解所有可用的 Zulip API
-
-## 常见问题
-
-### 如何测试 Bot？
-
-在测试服务器或私人频道中测试你的 Bot。
-
-### Bot 没有响应？
-
-1. 检查 `.zuliprc` 配置是否正确
-2. 确认 Bot 账户有权限访问相关频道
-3. 查看日志输出是否有错误信息
-
-### 如何处理错误？
+### How to handle errors?
 
 ```python
 from bot_sdk import BaseBot, Message
@@ -169,9 +114,9 @@ from loguru import logger
 class MyBot(BaseBot):
     async def on_message(self, message: Message) -> None:
         try:
-            # 你的逻辑
-            await self.send_reply(message, "处理成功")
+            # Your logic
+            await self.send_reply(message, "Processed successfully")
         except Exception as e:
-            logger.error(f"处理消息失败: {e}")
-            await self.send_reply(message, "抱歉，出错了！")
+            logger.error(f"Failed to process message: {e}")
+            await self.send_reply(message, "Sorry, an error occurred!")
 ```

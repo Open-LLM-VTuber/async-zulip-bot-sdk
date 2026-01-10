@@ -1,42 +1,42 @@
-# Async Zulip Bot SDK API 文档
+# Async Zulip Bot SDK API Documentation
 
-欢迎使用 Async Zulip Bot SDK 的 API 文档。本文档提供了该 SDK 所有核心组件的详细说明。
+Welcome to the API documentation for Async Zulip Bot SDK. This documentation provides detailed information about all core components of the SDK.
 
-## 目录
+## Table of Contents
 
-- [快速开始](quickstart.md)
-- [核心组件](core.md)
-  - [AsyncClient](async_client.md) - 异步 Zulip API 客户端
-  - [BaseBot](base_bot.md) - Bot 基类
-  - [BotRunner](bot_runner.md) - Bot 运行器
-- [命令系统](commands.md)
-  - [CommandParser](commands.md#commandparser) - 命令解析器
-  - [CommandSpec](commands.md#commandspec) - 命令规范
-  - [CommandArgument](commands.md#commandargument) - 命令参数
-- [数据模型](models.md)
-  - [请求模型](models.md#请求模型)
-  - [响应模型](models.md#响应模型)
-  - [数据类型](models.md#数据类型)
-- [配置](config.md)
-- [日志](logging.md)
+- [Quick Start](quickstart.md)
+- [Core Components](core.md)
+  - [AsyncClient](async_client.md) - Async Zulip API Client
+  - [BaseBot](base_bot.md) - Bot Base Class
+  - [BotRunner](bot_runner.md) - Bot Runner
+- [Command System](commands.md)
+  - [CommandParser](commands.md#commandparser) - Command Parser
+  - [CommandSpec](commands.md#commandspec) - Command Specification
+  - [CommandArgument](commands.md#commandargument) - Command Arguments
+- [Data Models](models.md)
+  - [Request Types](models.md#request-types)
+  - [Response Types](models.md#response-types)
+  - [Data Types](models.md#data-types)
+- [Configuration](config.md)
+- [Logging](logging.md)
 
-## 简介
+## Introduction
 
-Async Zulip Bot SDK 是一个基于 Python asyncio 的异步 Zulip 机器人开发框架。它提供了：
+Async Zulip Bot SDK is an asynchronous Zulip bot development framework based on Python asyncio. It provides:
 
-- 🚀 完全异步的 API 客户端
-- 🤖 简单易用的 Bot 基类
-- 📝 强大的命令解析系统
-- 🔧 灵活的配置管理
-- 📊 类型安全的数据模型
+- 🚀 Fully asynchronous API client
+- 🤖 Easy-to-use Bot base class
+- 📝 Powerful command parsing system
+- 🔧 Flexible configuration management
+- 📊 Type-safe data models
 
-## 安装
+## Installation
 
 ```bash
 pip install async-zulip-bot-sdk
 ```
 
-## 快速示例
+## Quick Example
 
 ```python
 from bot_sdk import BaseBot, BotRunner, AsyncClient, Message
@@ -51,10 +51,10 @@ if __name__ == "__main__":
     run_bot(MyBot)
 ```
 
-## 版本
+## Version
 
-当前版本：0.9.1-async
+Current version: 0.9.1-async
 
-## 许可证
+## License
 
-本项目采用 MIT 许可证。
+This project is licensed under the MIT License.
