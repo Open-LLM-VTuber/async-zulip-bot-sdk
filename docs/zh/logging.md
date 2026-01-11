@@ -2,6 +2,13 @@
 
 Bot SDK 使用 [Loguru](https://github.com/Delgan/loguru) 作为日志库，提供简单而强大的日志功能。
 
+## 控制台集成
+
+当运行交互式控制台 (`main.py`) 时：
+- 日志会自动被捕获并显示在 TUI 的 "Logs" 面板中。
+- 控制台 UI (基于 Rich) 会保留 ANSI 颜色，提供良好的阅读体验。
+- 支持通过 `PageUp`/`PageDown` 滚动查看历史日志。
+
 ## 快速开始
 
 ### 基础用法

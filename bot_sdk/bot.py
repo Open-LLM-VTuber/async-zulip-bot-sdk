@@ -30,34 +30,27 @@ if TYPE_CHECKING:  # pragma: no cover - type-only import to avoid cycles
 
 
 class BaseBot(abc.ABC):
-    """Base class for bots. Override `on_message` and optional `on_event`."""
+    """Base class for bots. Override `on_message` and optional `on_event`.
 
-    # Prefix characters that mark a command (e.g., "/help" or "!ping").
-    # As Zulip reserves "/" for system commands, "!" or other characters are often a better choice.
-    command_prefixes = ("!",)
-    # Whether to treat leading @-mentions as commands.
-    enable_mention_commands = True
-    # Whether to auto-register the built-in help command.
-    auto_help_command = True
-    # Storage configuration (KV-based)
-    enable_storage = True
-    storage_path: Optional[str] = None  # Defaults to "bot_data/{bot_name}.db"
-    storage_config: Optional[StorageConfig] = None
-
-    # ORM configuration (SQLAlchemy-based)
-    # Disabled by default; enable per-bot by setting enable_orm = True
-    enable_orm: bool = False
-    # By default, ORM DB path is resolved as "bot_data/<bot_module_dir>.sqlite"
-    orm_db_path: Optional[str] = None
+    Breaking change: configuration now comes from per-bot YAML only
+    (see `BotLocalConfig`). Class-level configuration attributes have
+    been removed to reduce ambiguity. Customize your bot via its
+    `bot.yaml` instead of subclass attributes.
+    """
 
     def __init__(self, client: AsyncClient) -> None:
         self.client = client
-        self.command_parser = CommandParser(
-            prefixes=self.command_prefixes,
-            enable_mentions=self.enable_mention_commands,
-            auto_help=self.auto_help_command,
-            translator=self.tr,
-        )
+        # These will be populated from bot.yaml in _load_settings
+        self.command_prefixes: tuple[str, ...] = tuple()
+        self.enable_mention_commands: bool = True
+        self.auto_help_command: bool = True
+        self.enable_storage: bool = True
+        self.storage_path: Optional[str] = None
+        self.storage_config: Optional[StorageConfig] = None
+        self.enable_orm: bool = False
+        self.orm_db_path: Optional[str] = None
+
+        self.command_parser: Optional[CommandParser] = None
         self.storage: Optional[BotStorage] = None
         self.settings: Optional[BotLocalConfig] = None
         self.perms: Optional[PermissionPolicy] = None
@@ -84,13 +77,14 @@ class BaseBot(abc.ABC):
         """Hook for post-initialization logic. Override if needed.
 
         Splits initialization into clear phases:
+        - load_settings: load per-bot YAML and apply overrides to class defaults
         - init_storage: prepare local persistence
         - load_identity: cache or fetch bot profile
         - set_presence: update active presence
         """
+        await self._load_settings()
         await self._init_storage()
         await self._init_orm()
-        await self._load_settings()
         await self._init_i18n()
         await self._load_identity()
         await self._set_presence()
@@ -183,14 +177,42 @@ class BaseBot(abc.ABC):
         # Load settings
         if not default_path.exists():
             logger.info(f"No bot settings file found at {default_path}, using defaults.")
-            self.settings = BotLocalConfig(owner_user_id=-1)
+            self.settings = BotLocalConfig()
             self._settings_path = default_path  # type: ignore[attr-defined]
             await self.save_settings()  # Save default config
             logger.info(f"Created default bot settings at {default_path}")
-            return
-        self.settings = load_bot_local_config(default_path)
-        self._settings_path = default_path  # type: ignore[attr-defined]
-        logger.info(f"Loaded bot settings from {default_path}")
+        else:
+            self.settings = load_bot_local_config(default_path)
+            self._settings_path = default_path  # type: ignore[attr-defined]
+            logger.info(f"Loaded bot settings from {default_path}")
+
+        # Apply settings to runtime fields (YAML is the single source of truth now)
+        overrides = self.settings
+        self.command_prefixes = tuple(overrides.command_prefixes or [])
+        if not self.command_prefixes:
+            # Fallback to safe default if config left empty
+            self.command_prefixes = ("!",)
+        self.enable_mention_commands = bool(
+            overrides.enable_mention_commands if overrides.enable_mention_commands is not None else True
+        )
+        self.auto_help_command = bool(
+            overrides.auto_help_command if overrides.auto_help_command is not None else True
+        )
+        self.enable_storage = bool(
+            overrides.enable_storage if overrides.enable_storage is not None else True
+        )
+        self.storage_path = overrides.storage_path
+        self.storage_config = overrides.storage or StorageConfig()
+        self.enable_orm = bool(overrides.enable_orm) if overrides.enable_orm is not None else False
+        self.orm_db_path = overrides.orm_db_path
+
+        # Recreate command parser to honor updated prefixes/mentions/help flags
+        self.command_parser = CommandParser(
+            prefixes=self.command_prefixes,
+            enable_mentions=self.enable_mention_commands,
+            auto_help=self.auto_help_command,
+            translator=self.tr,
+        )
 
     async def _load_identity(self) -> None:
         """Load bot identity from cache or fetch from server once."""
@@ -603,6 +625,8 @@ class BaseBot(abc.ABC):
         return None
 
     def parse_command(self, message: Message) -> CommandInvocation | None:
+        if not self.command_parser:
+            raise RuntimeError("Command parser is not initialized; ensure post_init has run")
         return self.command_parser.parse_message(message)
 
     async def send_reply(self, original: Message, content: str) -> None:

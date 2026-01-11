@@ -26,7 +26,24 @@ site=https://your-zulip-server.com
 
 ## 创建你的第一个 Bot
 
-### 1. 基础 Echo Bot
+### 选项 1：使用交互式控制台（管理多个 Bot）
+
+SDK 包含一个 `main.py` 入口点，可启动功能丰富的交互式控制台。这是开发和运行 Bot 的推荐方式，因为它支持热重载和管理多个 Bot。
+
+> 重大变更：Bot 的配置现在只从各自的 `bot.yaml` 读取，类属性（如 `command_prefixes`、`enable_orm`）将被忽略。
+
+1. **运行管理器**：
+   ```bash
+   python main.py
+   ```
+   
+   控制台支持：
+   
+   - **命令历史**：使用 `上`/`下` 箭头键。
+   - **日志滚动**：使用 `PageUp`/`PageDown` 键。
+   - **热重载**：使用 `reload <bot_name>` 命令。
+
+### 选项 2：基础 Echo Bot 脚本
 
 创建 `my_bot.py`：
 

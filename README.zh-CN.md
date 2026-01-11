@@ -16,11 +16,14 @@
 
 ### ✨ 特性
 
-- 🚀 **异步优先** — 基于 `httpx.AsyncClient` 的 Zulip REST API 异步绑定，完全兼容官方 `zulip.Client` 接口
+- 🚀 **异步优先** — 基于 `httpx.AsyncClient` 的高性能异步操作，完全兼容官方 `zulip.Client` 接口
 - 📝 **类型安全** — 使用 Pydantic v2 模型提供完整的类型提示和自动验证
-- 🎯 **命令系统** — 内置强大的命令解析器，支持类型检查、参数验证和自动帮助生成
-- 🔧 **简单易用** — 极简的 Bot 基类和生命周期钩子，快速开发生产级机器人
-- 📦 **开箱即用** — 长轮询事件循环、错误重试、自动重连全部内置
+- 🎯 **命令系统** — 强大的内置命令解析器，支持类型检查、参数验证和自动帮助生成
+- 💾 **灵活存储** — 可选择轻量级 JSON 存储或完整的 SQLAlchemy ORM（支持 Alembic 迁移）
+- 🌐 **国际化支持** — 内置 i18n 支持，基于 JSON 的翻译文件
+- 🔧 **YAML 配置** — 在 `bot.yaml` 中统一管理所有机器人配置
+- 🖥️ **交互式控制台** — 基于 Rich 的精美 TUI 界面，支持多机器人管理、实时日志和命令历史
+- 📦 **生产就绪** — 内置长轮询事件循环、自动重连和错误恢复机制
 
 ### 📦 安装
 
@@ -56,6 +59,27 @@ pip install -e .
 
 ### 🚀 快速开始
 
+> ⚠️ 重大变更（下一主版本）：Bot 配置仅从各自的 `bot.yaml` 读取，类属性（如 `command_prefixes`、`enable_storage`、`enable_orm`）不再生效。请在该 Bot 的 YAML 中设置前缀/提及/help/存储/ORM 等选项。
+
+#### 交互式控制台（推荐）
+
+本 SDK 内置了一个功能强大的交互式控制台，用于管理 Bot，基于 `rich` 提供了美观的 TUI（文本用户界面）。
+
+1. **运行控制台**：
+   ```bash
+   python main.py
+   ```
+
+   **主要功能：**
+   - **Rich TUI**：美观的分屏布局，同时显示日志、状态和输入框。
+   - **命令历史**：使用 `上`/`下` 箭头键浏览历史命令。
+   - **日志滚动**：使用 `PageUp`/`PageDown` 键滚动查看历史日志。
+   - **Bot 管理**：动态启动、停止和重载 Bot。
+
+#### 创建单文件 Bot
+
+如果您只需要一个简单的脚本，不需要管理器：
+
 #### 1. 配置 Zulip 凭据
 
 下载 `zuliprc` 文件：
@@ -69,16 +93,30 @@ pip install -e .
 
 ```yaml
 bots:
-    - name: echo_bot
-        module: bots.echo_bot        # 位于 bots/echo_bot/__init__.py
-        class_name: BOT_CLASS        # 可选，默认使用 BOT_CLASS 或首个 BaseBot 子类
-        enabled: true
-        # 可选：自定义 zuliprc 路径（默认 bots/<name>/zuliprc）
-        # zuliprc: bots/echo_bot/zuliprc
-        config: {}                   # 可选，作为第二个参数传给工厂
+  - name: echo_bot
+    module: bots.echo_bot
+    class_name: BOT_CLASS
+    enabled: true
+    # 可选：自定义 zuliprc 路径（默认 bots/<name>/zuliprc）
+    # zuliprc: bots/echo_bot/zuliprc
+    config: {}  # 可选，作为第二个参数传给工厂
+```
+#### 3. 配置每个 Bot 的 bot.yaml
+
+在 `bots/echo_bot/bot.yaml` 里设置前缀/提及/help/存储/ORM 等：
+
+```yaml
+command_prefixes: ["!", "/"]
+enable_mention_commands: true
+auto_help_command: true
+enable_storage: true
+# storage_path: bot_data/echo_bot.db
+enable_orm: false
+# orm_db_path: bot_data/echo_bot.sqlite
+language: en
 ```
 
-#### 3. 创建你的第一个机器人
+#### 4. 创建你的第一个机器人
 
 ```python
 import asyncio
@@ -93,11 +131,9 @@ from bot_sdk import (
 )
 
 class MyBot(BaseBot):
-    command_prefixes = ("!", "/")  # 命令前缀
-    
     def __init__(self, client):
         super().__init__(client)
-        # 注册命令
+        # 注册命令（前缀来源于 bot.yaml）
         self.command_parser.register_spec(
             CommandSpec(
                 name="echo",
@@ -125,7 +161,7 @@ BOT_CLASS = MyBot
 
 将这段代码保存到你在 `bots.yaml` 中配置的目录的 `__init__.py` 文件里，例如示例中存放为 `bots/echo_bot/__init__.py`。
 
-#### 4. 运行机器人
+#### 5. 运行机器人
 
 ```bash
 python main.py
@@ -208,10 +244,12 @@ class MyBot(BaseBot):
 
 #### 自定义命令前缀和提及检测
 
-```python
-class MyBot(BaseBot):
-    command_prefixes = ("!", "/", ".")
-    enable_mention_commands = True  # 启用 @bot 触发命令
+> ⚠️ 注意：从下一主版本开始，配置应在 `bot.yaml` 中设置，而非类属性。
+
+在 `bot.yaml` 中配置：
+```yaml
+command_prefixes: ["!", "/", "."]
+enable_mention_commands: true  # 启用 @bot 触发命令
 ```
 
 #### 类型化的消息模型
@@ -240,8 +278,8 @@ async def on_message(self, message: Message):
 
 完整的 API 文档可在线访问：
 
-- **在线文档（推荐）**：https://docs.llmvtuber.com/async-zulip-bot-sdk/
-- **仓库内文档**：见 `docs/` 目录，可使用 `mkdocs serve` 在本地预览
+- **在线文档**（托管版）：https://docs.llmvtuber.com/async-zulip-bot-sdk/
+- **源码文档**（本仓库）：见 `docs/` 目录（使用 `mkdocs serve` 构建）
 
 文档包括：
 - 📖 快速开始指南
@@ -261,9 +299,9 @@ async def on_message(self, message: Message):
 
 ### 🙏 致谢与声明
 
-- [bot_sdk/async_zulip.py](bot_sdk/async_zulip.py) 的部分实现参考了 Zulip 官方客户端源码：https://github.com/zulip/python-zulip-api/blob/main/zulip/zulip/__init__.py。
-- 上游项目采用 Apache-2.0 许可证，原始版权与许可证声明已保留在源代码中，完整许可证文本随项目附带于 [Apache2.0.LICENSE](Apache2.0.LICENSE)。
-- 感谢 [Zulip 团队](https://github.com/zulip/) 的开源贡献与支持。
+- [bot_sdk/async_zulip.py](bot_sdk/async_zulip.py) 的部分实现改编自 Zulip 上游客户端：https://github.com/zulip/python-zulip-api/blob/main/zulip/zulip/__init__.py。
+- 上游项目采用 Apache-2.0 许可证；原始许可声明已保留在源码中，完整许可证文本见 [Apache2.0.LICENSE](Apache2.0.LICENSE)。
+- 特别感谢 Zulip 团队的卓越工作和开源贡献。
 
 ### 📄 许可证
 

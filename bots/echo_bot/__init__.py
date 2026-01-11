@@ -4,7 +4,6 @@ from bot_sdk import BaseBot, CommandArgument, CommandInvocation, CommandSpec, Me
 
 
 class EchoBot(BaseBot):
-    command_prefixes = ("!",)
 
     def __init__(self, client):
         super().__init__(client)

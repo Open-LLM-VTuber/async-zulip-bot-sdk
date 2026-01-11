@@ -4,25 +4,32 @@ Configure bots via `bots.yaml` using Pydantic models `AppConfig` / `BotConfig`.
 
 ## BotLocalConfig (per-bot settings)
 
-Stored in `bot.yaml` (in the same directory as your bot module). Fields:
+Stored in `bot.yaml` (same directory as the bot module). **Breaking change:** class-level attributes are no longer read; configure everything here.
 
-- `owner_user_id` (int, optional): Explicit bot owner (Zulip user_id), independent of org owners/admins.
-- `language` (str, default `"en"`): Default language/locale code for this bot (e.g., `"en"`, `"zh"`). Controls which translation files are loaded by the i18n system.
-- `role_levels` (dict[str, int]): Mapping of role names to numeric privilege levels. Default:
-  - `user`: 1
-  - `admin`: 50
-  - `owner`: 100
-  - `bot_owner`: 200
-  
-  Higher levels grant more privileges. Used for permission checks on commands with `min_level` set. These can be customized per-bot.
-  
-- `settings` (dict, default `{}`): Extra arbitrary key-value settings for bot-specific use.
+Fields (with defaults):
+
+- `command_prefixes` (list[str], default `['!']`): Command prefixes.
+- `enable_mention_commands` (bool, default `true`): Treat @-mentions as commands.
+- `auto_help_command` (bool, default `true`): Auto-register built-in help command.
+- `enable_storage` (bool, default `true`): Enable KV storage.
+- `storage_path` (str, optional): Override KV DB path; otherwise `bot_data/<bot>.db`.
+- `storage` (`StorageConfig`, default object): KV flush/cache settings.
+- `enable_orm` (bool, default `false`): Enable ORM; reuses storage DB unless `orm_db_path` set.
+- `orm_db_path` (str, optional): Separate ORM DB path.
+- `owner_user_id` (int, optional): Explicit bot owner (Zulip user_id).
+- `language` (str, default `"en"`): Locale for i18n.
+- `role_levels` (dict[str, int], default `{user:1, admin:50, owner:100, bot_owner:200}`): Permission levels.
+- `settings` (dict, default `{}`): Arbitrary bot-specific settings.
 
 **Example `bot.yaml`**:
 
 ```yaml
-owner_user_id: 42
-language: zh
+command_prefixes: ["!", "/"]
+enable_mention_commands: true
+auto_help_command: true
+enable_storage: true
+enable_orm: false
+language: en
 role_levels:
   user: 1
   moderator: 30

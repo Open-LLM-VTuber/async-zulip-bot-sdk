@@ -52,6 +52,11 @@ class BotLocalConfig(BaseModel):
     - role_levels: mapping of role name -> numeric level (higher is more privileged)
     - settings: extra arbitrary settings for the bot
     - language: default language/locale code for this bot (e.g. "en", "zh")
+
+    Optional overrides (when set) take precedence over BaseBot class attributes:
+    - command_prefixes, enable_mention_commands, auto_help_command
+    - enable_storage, storage_path, storage (StorageConfig)
+    - enable_orm, orm_db_path
     """
 
     owner_user_id: Optional[int] = None
@@ -65,6 +70,16 @@ class BotLocalConfig(BaseModel):
         }
     )
     settings: dict[str, Any] = Field(default_factory=dict)
+
+    # Optional overrides for BaseBot defaults
+    command_prefixes: Optional[tuple[str, ...]] = Field(default_factory=lambda: ("!",))
+    enable_mention_commands: Optional[bool] = True
+    auto_help_command: Optional[bool] = True
+    enable_storage: Optional[bool] = True
+    storage_path: Optional[str] = None
+    storage: Optional[StorageConfig] = Field(default_factory=StorageConfig)
+    enable_orm: Optional[bool] = False
+    orm_db_path: Optional[str] = None
 
 
 def load_bot_local_config(path: str | Path) -> BotLocalConfig:
