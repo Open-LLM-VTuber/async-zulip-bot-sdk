@@ -15,8 +15,6 @@ from bot_sdk import BaseBot, CommandInvocation, CommandSpec, Message
 class CounterBot(BaseBot):
     """A simple bot that counts messages using persistent storage."""
 
-    command_prefixes = ("!",)
-
     def __init__(self, client):
         super().__init__(client)
         

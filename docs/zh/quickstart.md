@@ -30,6 +30,8 @@ site=https://your-zulip-server.com
 
 SDK 包含一个 `main.py` 入口点，可启动功能丰富的交互式控制台。这是开发和运行 Bot 的推荐方式，因为它支持热重载和管理多个 Bot。
 
+> 重大变更：Bot 的配置现在只从各自的 `bot.yaml` 读取，类属性（如 `command_prefixes`、`enable_orm`）将被忽略。
+
 1. **运行管理器**：
    ```bash
    python main.py

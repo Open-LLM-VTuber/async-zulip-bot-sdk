@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterable, Optional, TYPE_CHECKING
@@ -62,7 +61,6 @@ class BotManager:
             spec.factory,
             client_kwargs={"config_file": spec.zuliprc},
             event_types=spec.event_types,
-            storage_config=spec.storage,
         )
         managed = ManagedBot(spec=spec, runner=runner)
         task = asyncio.create_task(self._run_runner(name, managed))

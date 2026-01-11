@@ -19,7 +19,6 @@ async def run_all_bots(bot_specs: Iterable[BotSpec]) -> None:
             spec.factory,
             client_kwargs={"config_file": spec.zuliprc},
             event_types=spec.event_types,
-            storage_config=spec.storage,
         )
         for spec in bot_specs
     ]

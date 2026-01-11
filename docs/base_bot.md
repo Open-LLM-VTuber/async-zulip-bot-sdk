@@ -18,12 +18,12 @@ class MyBot(BaseBot):
         await self.send_reply(message, "Received!")
 ```
 
-## Class attributes
-- **command_prefixes**: Default (`"/", "!"`). Prefixes that trigger commands.
-- **enable_mention_commands**: Treat @-mentions as commands (default `True`).
-- **auto_help_command**: Auto-register built-in help command (default `True`).
+## Configuration (breaking change)
 
-Built-ins registered by default:
+- Configuration now comes from each bot's `bot.yaml` (fields in `BotLocalConfig`).
+- Former class attributes (`command_prefixes`, `enable_mention_commands`, `auto_help_command`, `enable_storage`, `enable_orm`, etc.) are no longer read. Set them in YAML instead (see `docs/config.md`).
+
+Built-ins registered by default (still enabled unless you disable `auto_help_command` in YAML):
 - `whoami`: show caller roles/level.
 - `perm`: manage permissions (bot owner, role levels, allow/deny stop); requires `min_level=200` (bot_owner).
 - `reload`: reload bot.yaml settings and i18n translations without restart; requires `min_level=50` (admin).
@@ -35,21 +35,21 @@ Built-in commands use i18n, so descriptions and success/error messages are local
 
 ## Instance attributes
 - **client**: The `AsyncClient` instance.
-- **command_parser**: The `CommandParser` instance.
-- **language**: Current language code (e.g., `"en"`, `"zh"`). Loaded from bot settings and used by i18n.
+- **command_parser**: The `CommandParser` instance, rebuilt using values from `bot.yaml`.
+- **language**: Current language code (e.g., `"en"`, `"zh"`). Loaded from `bot.yaml` and used by i18n.
 - **i18n**: Optional `I18n` instance for translating user-facing strings. Initialized during `post_init()`.
 - **settings**: The `BotLocalConfig` instance (per-bot YAML configuration).
 
 ## Lifecycle hooks
 
 - **post_init()**: Runs after creation. Steps:
-  1. Initialize storage (KV backend)
-  2. Initialize ORM engine (if enabled)
-  3. Load per-bot settings from `bot.yaml`
-  4. Initialize i18n (language and translations)
-  5. Fetch and cache bot profile
-  6. Set presence to "active"
-  7. Register built-in and custom commands
+    1. Load per-bot settings from `bot.yaml` and apply config (prefixes/mentions/help/storage/ORM).
+    2. Initialize storage (KV backend).
+    3. Initialize ORM engine (if enabled).
+    4. Initialize i18n (language and translations).
+    5. Fetch and cache bot profile.
+    6. Set presence to "active".
+    7. Register built-in and custom commands.
   
 - **on_start()**: Runs after startup (before entering the event loop).
 - **on_stop()**: Runs before shutdown. Default: persist settings, dispose ORM engine.

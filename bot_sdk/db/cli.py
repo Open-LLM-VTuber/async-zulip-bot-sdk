@@ -14,6 +14,22 @@ from bot_sdk.db.database import make_sqlite_url
 from bot_sdk.loader import _extract_factory
 
 
+def _ensure_migration_templates(migrations_dir: Path) -> None:
+    """Ensure Alembic env.py and script.py.mako exist in the target migrations dir."""
+
+    template_env = Path("bot_sdk") / "db" / "migrations" / "env.py"
+    target_env = migrations_dir / "env.py"
+    if not target_env.exists():
+        if not template_env.exists():
+            raise FileNotFoundError(f"Alembic template env.py not found at {template_env}")
+        target_env.write_text(template_env.read_text(encoding="utf-8"), encoding="utf-8")
+
+    template_script = Path("bot_sdk") / "db" / "migrations" / "script.py.mako"
+    target_script = migrations_dir / "script.py.mako"
+    if not target_script.exists() and template_script.exists():
+        target_script.write_text(template_script.read_text(encoding="utf-8"), encoding="utf-8")
+
+
 def ensure_bot_orm_enabled(bot_name: str, bots_dir: str = "bots") -> Optional[type[BaseBot]]:
     """Validate that the target bot exists and has ORM enabled.
 
@@ -112,19 +128,7 @@ def make_bot_migrations(bot_name: str, message: Optional[str] = None) -> None:
     versions_dir.mkdir(parents=True, exist_ok=True)
 
     # Seed env.py and script.py.mako from the SDK-level templates if they don't exist yet.
-    # Bot authors can then import their ORM models inside that env.py
-    # so Alembic's autogenerate can pick them up.
-    template_env = Path("bot_sdk") / "db" / "migrations" / "env.py"
-    target_env = migrations_dir / "env.py"
-    if not target_env.exists():
-        if not template_env.exists():
-            raise FileNotFoundError(f"Alembic template env.py not found at {template_env}")
-        target_env.write_text(template_env.read_text(encoding="utf-8"), encoding="utf-8")
-
-    template_script = Path("bot_sdk") / "db" / "migrations" / "script.py.mako"
-    target_script = migrations_dir / "script.py.mako"
-    if not target_script.exists() and template_script.exists():
-        target_script.write_text(template_script.read_text(encoding="utf-8"), encoding="utf-8")
+    _ensure_migration_templates(migrations_dir)
 
     # Use the same DB path that the bot would use at runtime so
     # ORM and KV storage share a single SQLite file by default.
@@ -167,17 +171,7 @@ def run_bot_migrations(bot_name: str, revision: str = "head") -> None:
         raise FileNotFoundError(f"Migrations directory not found for bot {bot_name}: {migrations_dir}")
 
     # Ensure env.py and script.py.mako exist (required by Alembic script environment)
-    template_env = Path("bot_sdk") / "db" / "migrations" / "env.py"
-    target_env = migrations_dir / "env.py"
-    if not target_env.exists():
-        if not template_env.exists():
-            raise FileNotFoundError(f"Alembic template env.py not found at {template_env}")
-        target_env.write_text(template_env.read_text(encoding="utf-8"), encoding="utf-8")
-
-    template_script = Path("bot_sdk") / "db" / "migrations" / "script.py.mako"
-    target_script = migrations_dir / "script.py.mako"
-    if not target_script.exists() and template_script.exists():
-        target_script.write_text(template_script.read_text(encoding="utf-8"), encoding="utf-8")
+    _ensure_migration_templates(migrations_dir)
 
     if bot_type is not None:
         db_path = resolve_bot_db_path(bot_type)

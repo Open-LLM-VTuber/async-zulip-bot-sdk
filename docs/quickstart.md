@@ -30,6 +30,8 @@ site=https://your-zulip-server.com
 
 The SDK includes a `main.py` entry point that launches a rich interactive console. This is the recommended way to develop and run bots, as it supports hot reloads and managing multiple bots.
 
+> Breaking change: Bot configuration is now read from each bot's `bot.yaml`. Class-level attributes (e.g., `command_prefixes`, `enable_orm`) are ignored.
+
 1. **Run the Manager**:
    ```bash
    python main.py

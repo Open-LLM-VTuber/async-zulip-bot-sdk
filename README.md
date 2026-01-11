@@ -14,6 +14,16 @@
 
 </div>
 
+### ✨ Features
+
+- 🚀 **Async-First** — Built on `httpx.AsyncClient` for high-performance async operations, fully compatible with official `zulip.Client` interface
+- 📝 **Type-Safe** — Complete type hints and automatic validation with Pydantic v2 models
+- 🎯 **Command System** — Powerful built-in command parser with type checking, argument validation, and auto-generated help
+- 💾 **Flexible Storage** — Choose between lightweight JSON storage or full SQLAlchemy ORM with Alembic migrations
+- 🌐 **Internationalization** — Built-in i18n support with JSON-based translation files
+- 🔧 **YAML Configuration** — Single source of truth for bot settings in `bot.yaml`
+- 🖥️ **Interactive Console** — Beautiful Rich-based TUI for managing multiple bots with live logs and command history
+- 📦 **Production-Ready** — Long-polling event loop, automatic reconnection, and error recovery built-in
 
 ### 📦 Installation
 
@@ -48,6 +58,9 @@ pip install -e .
 ```
 
 ### 🚀 Quick Start
+
+> ⚠️ Breaking change (next major): bot configuration now lives in each bot's `bot.yaml`. Class-level attributes (e.g., `command_prefixes`, `enable_storage`, `enable_orm`) are ignored.
+> Set prefixes/mention/help/storage/ORM options in the bot's YAML instead of subclass attributes.
 
 #### Interactive Console (Recommended)
 
@@ -90,7 +103,22 @@ bots:
     config: {}  # optional per-bot config passed to factory (second arg)
 ```
 
-#### 3. Create Your First Bot
+#### 3. Configure per-bot settings (bot.yaml)
+
+Create `bots/echo_bot/bot.yaml` to set prefixes/mentions/help/storage/ORM:
+
+```yaml
+command_prefixes: ["!", "/"]
+enable_mention_commands: true
+auto_help_command: true
+enable_storage: true
+# storage_path: bot_data/echo_bot.db
+enable_orm: false
+# orm_db_path: bot_data/echo_bot.sqlite
+language: en
+```
+
+#### 4. Create Your First Bot
 
 ```python
 import asyncio
@@ -105,11 +133,9 @@ from bot_sdk import (
 )
 
 class MyBot(BaseBot):
-    command_prefixes = ("!", "/")  # Command prefixes
-    
     def __init__(self, client):
         super().__init__(client)
-        # Register commands
+        # Register commands (prefixes come from bot.yaml)
         self.command_parser.register_spec(
             CommandSpec(
                 name="echo",
@@ -138,7 +164,7 @@ BOT_CLASS = MyBot
 Remember to save this code in a `__init__.py` file under the directory your configured in `bots.yaml`.
 In this example, you would save it as `bots/echo_bot/__init__.py`.
 
-#### 4. Run Your Bots
+#### 5. Run Your Bots
 
 ```bash
 python main.py
