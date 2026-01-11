@@ -115,14 +115,11 @@ class BotManager:
 
 class LogBuffer:
     def __init__(self, max_lines: int = 400) -> None:
-        self._lines: list[str] = []
-        self._max_lines = max_lines
+        self._lines = deque(maxlen=max_lines)
 
     def append(self, message: str) -> None:
         # Sink for loguru: receives formatted string messages.
         self._lines.extend(message.rstrip("\n").splitlines())
-        if len(self._lines) > self._max_lines:
-            self._lines = self._lines[-self._max_lines :]
 
     @property
     def lines(self) -> list[str]:
