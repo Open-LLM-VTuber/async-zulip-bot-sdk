@@ -251,6 +251,15 @@ class BaseBot(abc.ABC):
                 min_level=default_levels.get("bot_owner", 200),
             )
         )
+        # Hot reload for settings and translations (admin-level by default)
+        self.command_parser.register_spec(
+            CommandSpec(
+                name="reload",
+                description=self.tr("Reload configuration and translations"),
+                handler=self._handle_reload,
+                min_level=default_levels.get("admin", 50),
+            )
+        )
         # Built-in: stop (bot shutdown)
         stop_min_level = default_levels.get("admin", 50)
         self.command_parser.register_spec(
@@ -363,7 +372,7 @@ class BaseBot(abc.ABC):
 
         if action == "set_owner":
             if not arg1:
-                await self.send_reply(message, err("Usage: !perm set_owner <user_id>"))
+                await self.send_reply(message, err(self.tr("Usage: !perm set_owner <user_id>")))
                 return
             try:
                 new_owner = int(arg1)
@@ -385,13 +394,13 @@ class BaseBot(abc.ABC):
 
         if action == "roles_set":
             if not arg1 or not arg2:
-                await self.send_reply(message, err("Usage: !perm roles_set <role> <level>"))
+                await self.send_reply(message, err(self.tr("Usage: !perm roles_set <role> <level>")))
                 return
             role = str(arg1)
             try:
                 level = int(arg2)
             except Exception:
-                await self.send_reply(message, err("Invalid level"))
+                await self.send_reply(message, err(self.tr("Invalid level")))
                 return
             if not self.settings:
                 self.settings = BotLocalConfig()
@@ -402,7 +411,7 @@ class BaseBot(abc.ABC):
 
         if action == "allow_stop":
             if not arg1:
-                await self.send_reply(message, err("Usage: !perm allow_stop <user_id>"))
+                await self.send_reply(message, err(self.tr("Usage: !perm allow_stop <user_id>")))
                 return
             try:
                 uid = int(arg1)
@@ -420,7 +429,7 @@ class BaseBot(abc.ABC):
 
         if action == "deny_stop":
             if not arg1:
-                await self.send_reply(message, err("Usage: !perm deny_stop <user_id>"))
+                await self.send_reply(message, err(self.tr("Usage: !perm deny_stop <user_id>")))
                 return
             try:
                 uid = int(arg1)
@@ -436,6 +445,32 @@ class BaseBot(abc.ABC):
             return
 
         await self.send_reply(message, err(self.tr("Unknown action. Use: set_owner | roles_show | roles_set | allow_stop | deny_stop")))
+
+    async def _handle_reload(self, invocation: CommandInvocation, message: Message, bot: BaseBot) -> None:
+        """Reload bot settings (bot.yaml) and i18n files without restart."""
+        # Reload settings from disk if we know where they live.
+        try:
+            settings_path = getattr(self, "_settings_path", None)
+        except Exception:
+            settings_path = None
+
+        try:
+            if settings_path is not None and settings_path.exists():
+                self.settings = load_bot_local_config(settings_path)
+                logger.info(f"Reloaded bot settings from {settings_path}")
+            else:
+                logger.warning("No settings path available for reload; skipping settings reload")
+
+            # Reinitialize i18n based on the possibly updated language.
+            await self._init_i18n()
+            await self.send_reply(message, f"✅ {self.tr('Configuration and translations reloaded.')}")
+        except Exception as exc:
+            logger.warning(f"Reload failed: {exc}")
+            await self.send_reply(
+                message,
+                f"❌ "
+                + self.tr("Failed to reload configuration: {error}", error=str(exc)),
+            )
 
     async def _handle_stop(self, invocation: CommandInvocation, message: Message, bot: BaseBot) -> None:
         """Stop the bot if the caller is authorized."""
@@ -461,7 +496,7 @@ class BaseBot(abc.ABC):
             await self.send_reply(message, self.tr("Permission denied: you cannot stop this bot."))
             return
 
-        await self.send_reply(message, "🛑 Stopping the bot...")
+        await self.send_reply(message, self.tr("🛑 Stopping the bot..."))
         if self._runner:
             self._runner.request_stop(reason=f"requested by user {requester}")
         else:
