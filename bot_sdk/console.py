@@ -11,6 +11,7 @@ from loguru import logger
 from .config import AppConfig, load_config
 from .loader import BotSpec, discover_bot_factories
 from .runner import BotRunner
+from .db.cli import make_bot_migrations, run_bot_migrations
 
 try:  # Optional rich-based UI
     from rich.console import Console
@@ -178,7 +179,7 @@ class ConsoleUI:
         status_table.add_column(justify="left")
         status_table.add_row("Running", ", ".join(self.manager.running_bots) or "none")
         status_table.add_row("Available", ", ".join(self.manager.available_bots) or "none")
-        status_table.add_row("Help", "start/stop/reload/status/bots/help/exit")
+        status_table.add_row("Help", "start/stop/reload/status/bots/help/exit/makemigrations/migrate")
         layout["status"].update(Panel(status_table, title="Status", border_style="magenta"))
 
         # Add cursor effect
@@ -192,7 +193,7 @@ class ConsoleUI:
 
 def _print_help(output_func: Callable[[str], None], manager: BotManager) -> None:
     help_lines = [
-        "Commands:",
+        "\nCommands:",
         "  start <bot>   - start a bot",
         "  stop <bot>    - stop a bot",
         "  reload <bot>  - stop then start a bot (reload module)",
@@ -200,6 +201,8 @@ def _print_help(output_func: Callable[[str], None], manager: BotManager) -> None
         "  bots          - list available bots",
         "  help          - show this help",
         "  exit/quit     - stop all and exit",
+        "  makemigrations <bot> [msg] - create migrations",
+        "  migrate <bot> [rev]      - apply migrations",
         "",
         f"Available bots: {', '.join(manager.available_bots) if manager.available_bots else 'none'}",
     ]
@@ -266,8 +269,41 @@ async def _handle_command(
         if not spec:
             output_func(f"Bot '{bot_name}' is not configured or disabled")
             return False
+        # Stop bot if running to release file locks (important for migrations/reloads)
+        if bot_name in manager.running_bots:
+            await manager.stop_bot(bot_name, reason="reload")
+            
         result = await manager.reload_bot(spec)
         output_func(result)
+        return False
+
+    if cmd == "makemigrations":
+        if not args:
+            output_func("Usage: makemigrations <bot> [message]")
+            return False
+        bot_name = args[0]
+        message = " ".join(args[1:]) if len(args) > 1 else None
+        try:
+            output_func(f"Creating migrations for {bot_name}...")
+            # Run in thread to allow UI updates
+            await asyncio.to_thread(make_bot_migrations, bot_name, message)
+            output_func(f"Migrations created successfully for {bot_name}")
+        except Exception as e:
+            output_func(f"Error creating migrations: {e}")
+        return False
+
+    if cmd == "migrate":
+        if not args:
+            output_func("Usage: migrate <bot> [revision]")
+            return False
+        bot_name = args[0]
+        revision = args[1] if len(args) > 1 else "head"
+        try:
+            output_func(f"Applying migrations for {bot_name}...")
+            await asyncio.to_thread(run_bot_migrations, bot_name, revision)
+            output_func(f"Migrations applied successfully for {bot_name}")
+        except Exception as e:
+            output_func(f"Error applying migrations: {e}")
         return False
 
     output_func(f"Unknown command: {cmd}. Type 'help' for list of commands.")
@@ -283,14 +319,14 @@ async def _load_spec(bot_name: str, config_path: Path, bots_dir: str, reload_mod
     return None
 
 
-async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots") -> None:
+async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", log_level: str = "INFO") -> None:
     cfg_path = Path(config_path)
     if not cfg_path.exists():
         raise FileNotFoundError("bots.yaml not found; please create it to list bots to launch")
 
     app_config = load_config(str(cfg_path), AppConfig)
     specs = discover_bot_factories(app_config, bots_dir)
-    manager = BotManager(specs)
+    manager: BotManager = BotManager(specs)
 
     # Rich-based pretty console with a Live layout and manual input handling via msvcrt.
     # This avoids blocking I/O and conflicting writes to stdout.
@@ -316,7 +352,7 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots") ->
             # Restore styling and ensure ANSI codes are preserved for Text.from_ansi
             timefmt = "%Y-%m-%d %H:%M:%S"
             fmt = "<green>{time:"+ timefmt +"}</green> |[<level>{level}</level>]| <cyan>{name} | line: {line}</cyan> | <level>{message}</level>"
-            logger.add(log_sink, format=fmt, level="INFO", enqueue=False, colorize=True)
+            logger.add(log_sink, format=fmt, level=log_level, enqueue=False, colorize=True)
 
             def output_to_logs(msg: str) -> None:
                 logger.info(msg)
