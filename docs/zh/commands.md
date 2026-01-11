@@ -22,6 +22,7 @@ parser = CommandParser(
     mention_aliases: Optional[Iterable[str]] = None,
     specs: Optional[Iterable[CommandSpec]] = None,
     auto_help: bool = True,
+    translator: Optional[Callable[[str], str]] = None,
 )
 ```
 
@@ -32,6 +33,7 @@ parser = CommandParser(
 - **mention_aliases**: 提及别名列表
 - **specs**: 初始命令规范列表
 - **auto_help**: 是否自动添加 help 命令
+- **translator**: 可选的翻译函数（如 `lambda s: bot.tr(s)`），用于本地化命令描述、帮助文本标签和错误信息
 
 **示例**：
 
@@ -124,16 +126,19 @@ await parser.dispatch(
 #### generate_help()
 
 ```python
-help_text = parser.generate_help() -> str
+help_text = parser.generate_help(user_level: Optional[int] = None) -> str
 ```
 
 生成概览帮助文本。
+
+- 若提供 `user_level`，权限等级低于 `min_level` 的命令会被隐藏
+- 所有描述和标签都通过翻译函数本地化（若提供了翻译函数）
 
 #### 内置 help 命令（支持单条指令详情）
 
 - 默认自动注册 `help` 命令。
 - 用法：
-    - `!help`：显示所有命令概要
+    - `!help`：显示所有命令概要（按调用者权限等级过滤）
     - `!help <command>`：显示指定指令的详细用法、参数描述、别名、最小权限（若设置）
 
 #### add_identity_aliases()
@@ -430,7 +435,7 @@ inv = CommandInvocation(
 
 - `CommandError`: 空命令或解析错误
 - `UnknownCommandError`: 未知命令
-- `InvalidArgumentsError`: 参数错误（错误信息会包含 Usage，便于纠正）
+- `InvalidArgumentsError`: 参数错误（错误信息会包含 Usage 和本地化的错误文本，便于纠正）
 
 ```python
 try:
@@ -438,6 +443,22 @@ try:
 except CommandError as e:
     print(f"命令错误: {e}")
 ```
+
+## 国际化 (i18n)
+
+向 `CommandParser.__init__` 提供 `translator` 函数时，以下字符串会被本地化：
+
+- 帮助输出中的命令描述
+- 帮助UI标签（"描述", "别名", "最小权限", "参数:", "必填", "可选", "多个"）
+- 错误信息：
+  - "缺少参数: {name}"
+  - "参数过多"
+  - "用法: {usage}"
+  - "参数 {name} 的值无效: {value}"
+  - "未知命令: {name}"
+  - "你没有权限使用命令: {name}"
+
+这样可以让整个命令系统用用户的语言回应。
 
 ### UnknownCommandError
 

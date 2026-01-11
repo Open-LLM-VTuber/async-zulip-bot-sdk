@@ -2,7 +2,40 @@
 
 Configure bots via `bots.yaml` using Pydantic models `AppConfig` / `BotConfig`.
 
-## BotConfig (per bot)
+## BotLocalConfig (per-bot settings)
+
+Stored in `bot.yaml` (in the same directory as your bot module). Fields:
+
+- `owner_user_id` (int, optional): Explicit bot owner (Zulip user_id), independent of org owners/admins.
+- `language` (str, default `"en"`): Default language/locale code for this bot (e.g., `"en"`, `"zh"`). Controls which translation files are loaded by the i18n system.
+- `role_levels` (dict[str, int]): Mapping of role names to numeric privilege levels. Default:
+  - `user`: 1
+  - `admin`: 50
+  - `owner`: 100
+  - `bot_owner`: 200
+  
+  Higher levels grant more privileges. Used for permission checks on commands with `min_level` set. These can be customized per-bot.
+  
+- `settings` (dict, default `{}`): Extra arbitrary key-value settings for bot-specific use.
+
+**Example `bot.yaml`**:
+
+```yaml
+owner_user_id: 42
+language: zh
+role_levels:
+  user: 1
+  moderator: 30
+  admin: 50
+  owner: 100
+  bot_owner: 200
+settings:
+  custom_key: custom_value
+```
+
+After editing `bot.yaml`, use `!reload` (admin-level command) to reload settings and translations without restarting.
+
+## BotConfig (per bot in bots.yaml)
 
 Fields:
 - `name` (str): Bot name/id.

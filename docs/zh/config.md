@@ -1,8 +1,41 @@
-# 配置（bots.yaml）
+# 配置
 
-通过 `bots.yaml` 配置多个 Bot，Pydantic 模型为 `AppConfig` / `BotConfig`。
+通过 `bots.yaml`（全局配置多个 Bot）和 `bot.yaml`（各 Bot 目录内的本地配置）来配置 Bot。
 
-## BotConfig（单个 Bot）
+## BotLocalConfig（Per-Bot 本地设置）
+
+存储在 `bot.yaml`（与 bot 模块在同一目录）。字段说明：
+
+- `owner_user_id` (int，可选)：显式指定 bot 所有者（Zulip user_id），独立于组织 owner/admin。
+- `language` (str，默认 `"en"`)：此 bot 的默认语言/地区代码（如 `"en"`, `"zh"`）。控制 i18n 系统加载哪个翻译文件。
+- `role_levels` (dict[str, int])：角色名到权限等级的映射。默认：
+  - `user`: 1
+  - `admin`: 50
+  - `owner`: 100
+  - `bot_owner`: 200
+  
+  等级越高权限越大。用于检查带 `min_level` 的命令。可按 bot 自定义。
+  
+- `settings` (dict，默认 `{}`)：其他 bot 特定的任意键值对。
+
+**示例 `bot.yaml`**：
+
+```yaml
+owner_user_id: 42
+language: zh
+role_levels:
+  user: 1
+  moderator: 30
+  admin: 50
+  owner: 100
+  bot_owner: 200
+settings:
+  custom_key: custom_value
+```
+
+修改 `bot.yaml` 后，可使用 `!reload`（管理员级别命令）在不重启 bot 的情况下重新加载配置和翻译。
+
+## BotConfig（bots.yaml 中的单个 Bot）
 
 字段说明：
 - `name` (str)：Bot 名称/标识。

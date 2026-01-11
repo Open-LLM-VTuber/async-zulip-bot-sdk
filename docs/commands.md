@@ -22,6 +22,7 @@ parser = CommandParser(
     mention_aliases: Iterable[str] | None = None,
     specs: Iterable[CommandSpec] | None = None,
     auto_help: bool = True,
+    translator: Callable[[str], str] | None = None,
 )
 ```
 
@@ -32,6 +33,7 @@ parser = CommandParser(
 - **mention_aliases**: Extra mention aliases.
 - **specs**: Initial command specs.
 - **auto_help**: Auto add `help` command.
+- **translator**: Optional function for translating static help strings (e.g., `lambda s: bot.tr(s)`). Used to localize command descriptions, help text labels, and error messages.
 
 **Example**
 
@@ -43,11 +45,14 @@ parser = CommandParser(prefixes=("/", "!", "#"), enable_mentions=True)
 
 - **register_spec(spec)**: Register a `CommandSpec`.
 - **parse_message(message)** → `CommandInvocation | None`.
-- **parse_text(text)** → `CommandInvocation` (raises on errors; usage is included in argument errors).
+- **parse_text(text)** → `CommandInvocation` (raises on errors; usage and error messages are localized if a translator is provided).
 - **dispatch(invocation, message, bot)**: Call handler (awaits if coroutine).
-- **generate_help()** → str: Auto build help overview.
+- **find_command_spec(text)** → `CommandSpec | None`: Lightweight lookup of which command would be invoked by raw text, without parsing arguments or raising errors. Used for early permission checks.
+- **generate_help(user_level=None)** → str: Auto build help overview.
+  - If `user_level` is provided, commands with `min_level > user_level` are hidden from the output.
+  - All descriptions and labels are translated via the translator function if provided.
 - **Built-in help command**: Enabled by default. Usage:
-    - `!help` — list all commands
+    - `!help` — list all commands (filtered by caller's permission level)
     - `!help <command>` — show detailed usage, argument descriptions, aliases, min_level (if set)
 - **add_identity_aliases(full_name=None, email=None, extra=None)**: Add mention aliases for the bot identity.
 
@@ -130,7 +135,23 @@ class CommandInvocation:
 
 - `CommandError`
 - `UnknownCommandError`
-- `InvalidArgumentsError` (message includes Usage for quick fixes)
+- `InvalidArgumentsError` (message includes Usage and error text for quick fixes; both are localized if a translator was provided)
+
+## Internationalization (i18n)
+
+When a `translator` function is provided to `CommandParser.__init__`, the following strings are localized:
+
+- Command descriptions in help output
+- Help UI labels ("Description", "Aliases", "Min level", "Args:", "required", "optional", "multiple")
+- Error messages:
+  - "Missing argument: {name}"
+  - "Too many arguments"
+  - "Usage: {usage}"
+  - "Invalid value for {name}: {value}"
+  - "Unknown command: {name}"
+  - "You do not have permission to use command: {name}"
+
+This allows the entire command system to respond in the user's language.
 
 ## Full example
 

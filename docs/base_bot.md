@@ -25,20 +25,34 @@ class MyBot(BaseBot):
 
 Built-ins registered by default:
 - `whoami`: show caller roles/level.
-- `perm`: manage permissions (bot owner, role levels, allow/deny stop).
-- `stop`: request a graceful BotRunner shutdown (permission-checked).
+- `perm`: manage permissions (bot owner, role levels, allow/deny stop); requires `min_level=200` (bot_owner).
+- `reload`: reload bot.yaml settings and i18n translations without restart; requires `min_level=50` (admin).
+- `stop`: request a graceful BotRunner shutdown (permission-checked); requires `min_level=50` (admin).
 
-Permission enforcement: if a `CommandSpec` has `min_level`, BaseBot checks it before dispatch; `perm/stop` include built-in limits.
+Permission enforcement: if a `CommandSpec` has `min_level`, BaseBot checks it before dispatch. Early permission denial is returned before argument parsing, so users see "Permission denied" rather than "Missing argument".
+
+Built-in commands use i18n, so descriptions and success/error messages are localized based on the bot's configured language.
 
 ## Instance attributes
 - **client**: The `AsyncClient` instance.
 - **command_parser**: The `CommandParser` instance.
+- **language**: Current language code (e.g., `"en"`, `"zh"`). Loaded from bot settings and used by i18n.
+- **i18n**: Optional `I18n` instance for translating user-facing strings. Initialized during `post_init()`.
+- **settings**: The `BotLocalConfig` instance (per-bot YAML configuration).
 
 ## Lifecycle hooks
 
-- **post_init()**: Runs after creation. Default: fetch profile, add identity aliases, set presence to "active".
-- **on_start()**: Runs after startup.
-- **on_stop()**: Runs before shutdown.
+- **post_init()**: Runs after creation. Steps:
+  1. Initialize storage (KV backend)
+  2. Initialize ORM engine (if enabled)
+  3. Load per-bot settings from `bot.yaml`
+  4. Initialize i18n (language and translations)
+  5. Fetch and cache bot profile
+  6. Set presence to "active"
+  7. Register built-in and custom commands
+  
+- **on_start()**: Runs after startup (before entering the event loop).
+- **on_stop()**: Runs before shutdown. Default: persist settings, dispose ORM engine.
 
 ## Event handling
 
@@ -50,6 +64,38 @@ Permission enforcement: if a `CommandSpec` has `min_level`, BaseBot checks it be
 
 - **parse_command(message)** → `CommandInvocation | None`: Parse message as command.
 - **command_parser.dispatch(...)**: Dispatch to a registered handler.
+- **tr(key, **kwargs)** → str: Translate a user-facing string using the bot's i18n system. Falls back to the key itself if i18n is not initialized or a translation is not found. Use this in custom command handlers and messages to enable multi-language support.
+
+## Internationalization (i18n)
+
+BaseBot automatically initializes an i18n system during `post_init()`:
+
+- **language** is read from `bot.yaml` (field `language`, default `"en"`)
+- Translations are loaded from:
+  - `<bot_module_dir>/i18n/{language}.json` (bot-specific overrides)
+  - `bot_sdk/i18n/{language}.json` (SDK defaults; fallback to English)
+- Built-in commands (whoami, perm, stop, reload) use `self.tr()` for all user-visible strings
+- Custom commands should also use `self.tr()` for multi-language support
+
+**Example**:
+
+```python
+class MyBot(BaseBot):
+    def register_commands(self):
+        self.command_parser.register_spec(
+            CommandSpec(
+                name="greet",
+                description=self.tr("Greet the user"),  # Translatable at registration time
+                handler=self.handle_greet,
+            )
+        )
+    
+    async def handle_greet(self, inv, message, bot):
+        # User-facing strings are translated
+        await self.send_reply(message, self.tr("Hello, {name}!", name=message.sender_full_name))
+```
+
+See [docs/i18n.md](i18n.md) (if available) for detailed i18n setup and per-bot translation files.
 
 ## Reply helper
 

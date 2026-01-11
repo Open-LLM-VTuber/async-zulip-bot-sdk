@@ -63,10 +63,13 @@ auto_help_command = True
 ### 内置命令
 
 - `whoami`：显示调用者的角色与权限等级。
-- `perm`：权限管理（设置 bot_owner、调整角色等级、允许/禁止 stop）。
-- `stop`：在具备权限时请求安全停止 BotRunner。
+- `perm`：权限管理（设置 bot_owner、调整角色等级、允许/禁止 stop）；需要 `min_level=200`（bot_owner）。
+- `reload`：在不重启的情况下重新加载 bot.yaml 配置和 i18n 翻译文件；需要 `min_level=50`（admin）。
+- `stop`：在具备权限时请求安全停止 BotRunner；需要 `min_level=50`（admin）。
 
-> 权限校验：如果 `CommandSpec` 设置了 `min_level`，BaseBot 会在分发前检查；`perm`/`stop` 已内置限制。
+> 权限校验：如果 `CommandSpec` 设置了 `min_level`，BaseBot 会在参数解析之前检查，所以权限不足的用户会立即看到 "权限不足" 而不是 "缺少参数"。
+>
+> 内置命令使用 i18n，所以描述和成功/失败提示会按 bot 配置的语言本地化。
 
 ## 实例属性
 
@@ -86,9 +89,29 @@ self.command_parser: CommandParser
 
 命令解析器实例，用于注册和解析命令。
 
-## 方法
+### language
 
-### 构造函数
+```python
+self.language: str
+```
+
+当前语言代码（如 `"en"`, `"zh"`）。从 bot 设置读取，用于 i18n 系统。
+
+### i18n
+
+```python
+self.i18n: Optional[I18n]
+```
+
+可选的 `I18n` 实例，用于翻译用户可见字符串。在 `post_init()` 期间初始化。
+
+### settings
+
+```python
+self.settings: Optional[BotLocalConfig]
+```
+
+`BotLocalConfig` 实例，包含 per-bot 的 YAML 配置。### 构造函数
 
 ```python
 def __init__(self, client: AsyncClient) -> None
@@ -110,16 +133,18 @@ async def post_init(self) -> None
 
 初始化后的钩子，用于设置 Bot。在 Bot 启动时自动调用。
 
-**默认行为**：
-1. 获取 Bot 的用户信息
-2. 设置命令解析器的身份别名
-
-3. 更新在线状态为 "active"
+**默认行为**（按顺序）：
+1. 初始化存储（KV 后端）
+2. 初始化 ORM 引擎（如启用）
+3. 从 `bot.yaml` 加载 per-bot 设置
+4. 初始化 i18n（语言和翻译文件）
+5. 获取并缓存 bot 的用户信息
+6. 更新在线状态为 "active"
+7. 注册内置和自定义命令
 
 **重写示例**：
 
 ```python
-
 class MyBot(BaseBot):
     async def post_init(self) -> None:
         await super().post_init()  # 调用父类方法
@@ -256,7 +281,54 @@ class MyBot(BaseBot):
                 print(f"命令: {cmd.name}, 参数: {cmd.args}")
 ```
 
-### 消息发送
+#### tr()
+
+```python
+def tr(self, key: str, **kwargs: Any) -> str
+```
+
+使用 bot 的 i18n 系统翻译用户可见的字符串。如果 i18n 未初始化或找不到翻译，则返回原 key。
+
+**参数**：
+
+- **key**: 翻译 key（通常是英文原文）
+- **kwargs**: 占位符替换（如 `tr("Hello {name}", name="Alice")`）
+
+**示例**：
+
+```python
+# 在命令处理器中使用
+await self.send_reply(message, self.tr("Hello {name}!", name=message.sender_full_name))
+```
+
+## 国际化 (i18n)
+
+BaseBot 在 `post_init()` 期间自动初始化一个 i18n 系统：
+
+- **language** 字段从 `bot.yaml` 读取（默认 `"en"`）
+- 翻译文件从以下位置加载：
+  - `<bot_module_dir>/i18n/{language}.json`（bot 特定覆盖）
+  - `bot_sdk/i18n/{language}.json`（SDK 默认值；英文回退）
+- 内置命令（whoami, perm, stop, reload）都使用 `self.tr()` 来渲染用户可见字符串
+- 自定义命令应该也使用 `self.tr()` 来支持多语言
+
+**示例**：
+
+```python
+class MyBot(BaseBot):
+    def register_commands(self):
+        self.command_parser.register_spec(
+            CommandSpec(
+                name="greet",
+                description=self.tr("问候用户"),  # 在注册时就可以翻译
+                handler=self.handle_greet,
+            )
+        )
+    
+    async def handle_greet(self, inv, message, bot):
+        # 用户可见的字符串被翻译
+        await self.send_reply(message, self.tr("你好，{name}!", name=message.sender_full_name))
+```
 
 #### send_reply()
 
