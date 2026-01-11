@@ -51,9 +51,11 @@ class BotLocalConfig(BaseModel):
     - owner_user_id: explicit bot owner (Zulip user_id), independent of org owners
     - role_levels: mapping of role name -> numeric level (higher is more privileged)
     - settings: extra arbitrary settings for the bot
+    - language: default language/locale code for this bot (e.g. "en", "zh")
     """
 
     owner_user_id: Optional[int] = None
+    language: str = "en"
     role_levels: dict[str, int] = Field(
         default_factory=lambda: {
             "user": 1,

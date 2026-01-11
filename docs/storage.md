@@ -199,6 +199,26 @@ async def on_start(self):
     )
 ```
 
+### Always-on auto cache (bots.yaml)
+
+Configure per-bot storage behavior in `bots.yaml` via `storage`:
+
+```yaml
+bots:
+    - name: dev_bot
+        module: bots.dev_bot
+        class_name: TranslatorBot
+        storage:
+            auto_cache: true
+            auto_flush_interval: 5.0
+            auto_flush_retry: 1.0
+            auto_flush_max_retries: 3
+```
+
+- Auto-cache keeps a memory cache alive and flushes periodically.
+- Flush retries are useful when the same SQLite file is shared with ORM writes; flush will back off when the DB is busy.
+- BotStorage sets SQLite WAL + `synchronous=NORMAL` + `busy_timeout=3000` by default to reduce lock contention.
+
 ## Usage patterns
 
 ### Counter
@@ -319,6 +339,7 @@ class PollBot(BaseBot):
 - `contains()` inside the cache context checks cache only (no DB hit)
 - DB files default to the `bot_data/` directory
 - All values are JSON-serialized automatically; keep values JSON-friendly
+- If you use ORM tables, keep their migrations per bot (separate Alembic dirs); reserve SDK-level migrations for shared tables only.
 
 ## Related docs
 

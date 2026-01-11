@@ -6,3 +6,9 @@ bots:
     # Optional override; defaults to bots/<name>/zuliprc
     # zuliprc: bots/echo_bot/zuliprc
     config: {}  # optional per-bot config passed to factory (second arg)
+    # Storage configuration
+    storage:
+      auto_cache: true
+      auto_flush_interval: 5.0 # seconds
+      auto_flush_retry: 1.0 # seconds
+      auto_flush_max_retries: 3

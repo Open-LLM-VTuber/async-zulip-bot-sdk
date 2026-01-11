@@ -13,6 +13,7 @@ from .commands import (
 )
 from .runner import BotRunner
 from .logging import setup_logging
+from .i18n import I18n, build_i18n_for_bot
 from .storage import BotStorage, CachedStorage
 from .config import StorageConfig
 from .models import (
@@ -85,4 +86,6 @@ __all__ = [
 	"create_sessionmaker",
 	"session_scope",
 	"AsyncRepository",
+	"I18n",
+	"build_i18n_for_bot",
 ]

@@ -133,9 +133,14 @@ class CommandParser:
         mention_aliases: Optional[Iterable[str]] = None,
         specs: Optional[Iterable[CommandSpec]] = None,
         auto_help: bool = True,
+        translator: Optional[Callable[[str], str]] = None,
     ) -> None:
         self.prefixes = tuple(prefixes)
         self.enable_mentions = enable_mentions
+        # Optional translator for built-in help strings; typically
+        # this is BaseBot.tr or a similar function. It must accept
+        # a single string key and return the translated string.
+        self._translator: Optional[Callable[[str], str]] = translator
         self.mention_aliases: List[str] = []
         if mention_aliases:
             self.set_mentions(mention_aliases)
@@ -149,6 +154,9 @@ class CommandParser:
             self.register_spec(
                 CommandSpec(
                     name="help",
+                    # Store the English key here and translate lazily
+                    # when rendering help, so that i18n initialization
+                    # order does not affect the final text.
                     description="Show available commands",
                     aliases=["?"],
                     args=[CommandArgument("command", str, required=False, description="Command name for detailed help")],
@@ -201,6 +209,26 @@ class CommandParser:
         parsed_args = self._parse_args(tokens[1:], spec)
         return CommandInvocation(name=spec.name, args=parsed_args, tokens=tokens, spec=spec)
 
+    def find_command_spec(self, text: str) -> Optional[CommandSpec]:
+        """Return the CommandSpec for a raw message text, if any.
+
+        This is a lightweight helper for callers that only need to know
+        *which* command would be invoked (e.g., for permission checks)
+        without fully parsing arguments or raising errors for unknown
+        commands. It respects the same prefixes and @-mention rules as
+        :meth:`parse_message`.
+        """
+
+        stripped = self._strip_prefix_or_mention(text)
+        if stripped is None:
+            return None
+        tokens = stripped.split()
+        if not tokens:
+            return None
+        name_token = tokens[0].lower()
+        command_name = self.alias_index.get(name_token, name_token)
+        return self.specs.get(command_name)
+
     async def dispatch(self, invocation: CommandInvocation, *, message: Any, bot: SupportsSendReply) -> None:
         handler = invocation.spec.handler
         if handler is None:
@@ -236,7 +264,9 @@ class CommandParser:
             if idx >= len(args_tokens):
                 if arg_spec.required:
                     usage = self._format_usage(spec)
-                    raise InvalidArgumentsError(spec.name, f"Missing argument: {arg_spec.name}\nUsage: {usage}")
+                    msg = self._tr("Missing argument: {name}").format(name=arg_spec.name)
+                    usage_line = self._tr("Usage: {usage}").format(usage=usage)
+                    raise InvalidArgumentsError(spec.name, f"{msg}\n{usage_line}")
                 parsed[arg_spec.name] = None
                 continue
 
@@ -245,7 +275,9 @@ class CommandParser:
 
         if not spec.allow_extra and idx < len(args_tokens):
             usage = self._format_usage(spec)
-            raise InvalidArgumentsError(spec.name, f"Too many arguments\nUsage: {usage}")
+            msg = self._tr("Too many arguments")
+            usage_line = self._tr("Usage: {usage}").format(usage=usage)
+            raise InvalidArgumentsError(spec.name, f"{msg}\n{usage_line}")
         return parsed
 
     def _convert_value(self, value: str, arg_spec: CommandArgument) -> ArgType:
@@ -263,7 +295,9 @@ class CommandParser:
         except InvalidArgumentsError:
             raise
         except Exception as exc:  # pragma: no cover - simple conversion guard
-            raise InvalidArgumentsError(arg_spec.name, f"Invalid value for {arg_spec.name}: {value}") from exc
+            template = self._tr("Invalid value for {name}: {value}")
+            message = template.format(name=arg_spec.name, value=value)
+            raise InvalidArgumentsError(arg_spec.name, message) from exc
 
     @staticmethod
     def _to_bool(value: str) -> bool:
@@ -274,30 +308,79 @@ class CommandParser:
             return False
         raise ValueError(value)
 
-    def generate_help(self) -> str:
-        prefix = self.prefixes[0] if self.prefixes else ""
+    def _tr(self, text: str) -> str:
+        """Translate a static help text if a translator was provided.
+
+        This keeps CommandParser decoupled from any particular i18n
+        system while still allowing SDK users (like BaseBot) to
+        provide a translation function. Failures are quietly ignored
+        so they don't pollute logs on startup or in edge cases.
+        """
+
+        if self._translator is None:
+            return text
+        try:
+            return self._translator(text)
+        except Exception:  # pragma: no cover - defensive fallback only
+            return text
+
+    def generate_help(self, *, user_level: Optional[int] = None) -> str:
         lines: List[str] = []
         for spec in self.specs.values():
             if not spec.show_in_help:
                 continue
+            # If a user level is provided and the command requires a higher
+            # level, hide it from the help output to keep things simple.
+            if user_level is not None and spec.min_level is not None and spec.min_level > user_level:
+                continue
             summary = self._format_usage(spec)
             if spec.description:
-                summary = f"{summary} — {spec.description}"
+                summary = f"{summary} — {self._tr(spec.description)}"
             lines.append(summary)
         return "\n".join(lines) if lines else "No commands registered."
 
     async def _handle_help(self, invocation: CommandInvocation, message: Any, bot: SupportsSendReply) -> None:
         # Default help handler: reply with generated help text.
+        # Try to obtain the caller's permission level if the bot exposes it.
+        user_level: Optional[int] = None
+        sender_id = getattr(message, "sender_id", None)
+        if sender_id is not None:
+            level_getter = getattr(bot, "get_user_level", None)
+            if callable(level_getter):
+                try:
+                    maybe_result = level_getter(sender_id)
+                    if hasattr(maybe_result, "__await__"):
+                        user_level = await maybe_result  # type: ignore[assignment]
+                    else:
+                        user_level = int(maybe_result)  # type: ignore[arg-type]
+                except Exception:  # pragma: no cover - help should degrade gracefully
+                    user_level = None
+
         target = invocation.args.get("command")
         if not target:
-            await bot.send_reply(message, self.generate_help())
+            await bot.send_reply(message, self.generate_help(user_level=user_level))
             return
 
         target_name = str(target).lower()
         spec_name = self.alias_index.get(target_name, target_name)
         spec = self.specs.get(spec_name)
         if not spec:
-            await bot.send_reply(message, f"Unknown command: {target}")
+            # Try to use bot-level i18n if available.
+            tr = getattr(bot, "tr", None)
+            if callable(tr):
+                await bot.send_reply(message, tr("Unknown command: {name}", name=str(target)))
+            else:
+                await bot.send_reply(message, f"Unknown command: {target}")
+            return
+
+        # If we know the user's level and the command requires a higher level,
+        # do not reveal full details.
+        if user_level is not None and spec.min_level is not None and user_level < spec.min_level:
+            tr = getattr(bot, "tr", None)
+            if callable(tr):
+                await bot.send_reply(message, tr("You do not have permission to use command: {name}", name=spec.name))
+            else:
+                await bot.send_reply(message, f"You do not have permission to use command: {spec.name}")
             return
 
         detail = self._format_spec_detail(spec)
@@ -321,16 +404,16 @@ class CommandParser:
         lines: List[str] = []
         lines.append(self._format_usage(spec))
         if spec.description:
-            lines.append(f"Description: {spec.description}")
+            lines.append(f"{self._tr('Description')}: {self._tr(spec.description)}")
         if spec.aliases:
-            lines.append(f"Aliases: {', '.join(spec.aliases)}")
+            lines.append(f"{self._tr('Aliases')}: {', '.join(spec.aliases)}")
         if spec.min_level is not None:
-            lines.append(f"Min level: {spec.min_level}")
+            lines.append(f"{self._tr('Min level')}: {spec.min_level}")
         if spec.args:
-            lines.append("Args:")
+            lines.append(self._tr("Args:"))
             for arg in spec.args:
-                requirement = "required" if arg.required else "optional"
-                multi = " (multiple)" if arg.multiple else ""
+                requirement = self._tr("required") if arg.required else self._tr("optional")
+                multi = f" ({self._tr('multiple')})" if arg.multiple else ""
                 desc = f" - {arg.name}: {requirement}{multi}"
                 validator_hint = self._format_validator_hint(arg.validator)
                 if arg.description:
@@ -351,6 +434,8 @@ class CommandParser:
                 return str(hint) if hint else ""
             except Exception:  # pragma: no cover - help rendering should not break help
                 return ""
+        # This is a developer-facing hint, not end-user text, so we
+        # intentionally keep it simple and non-localized.
         return f"validated by {validator.__class__.__name__}"
 
 
