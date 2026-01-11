@@ -56,7 +56,7 @@ class BaseBot(abc.ABC):
             prefixes=self.command_prefixes,
             enable_mentions=self.enable_mention_commands,
             auto_help=self.auto_help_command,
-            translator=lambda s: self.tr(s),
+            translator=self.tr,
         )
         self.storage: Optional[BotStorage] = None
         self.settings: Optional[BotLocalConfig] = None
