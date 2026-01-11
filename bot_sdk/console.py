@@ -50,6 +50,12 @@ class BotManager:
     def set_spec(self, spec: BotSpec) -> None:
         self._specs[spec.name] = spec
 
+    async def start_all(self) -> list[str]:
+        results: list[str] = []
+        for name in self.available_bots:
+            results.append(await self.start_bot(name))
+        return results
+
     async def start_bot(self, name: str) -> str:
         async with self._lock:
             if name in self._running:
@@ -69,7 +75,7 @@ class BotManager:
 
         async with self._lock:
             self._running[name] = managed
-        return f"Started bot '{name}'"
+        return f"Starting bot '{name}'"
 
     async def _run_runner(self, name: str, managed: ManagedBot) -> None:
         try:
@@ -146,13 +152,13 @@ class ConsoleUI:
         layout = Layout()
         layout.split_column(
             Layout(name="logs", ratio=3),
-            Layout(name="status", size=6),
+            Layout(name="status", size=5),
             Layout(name="prompt", size=3),
         )
 
         # Calculate visible log lines based on console height
-        # Approx height available for logs = total - status(6) - prompt(3) - borders(6)
-        log_height = max(10, self.console.height - 15)
+        # Approx height available for logs = total - status(5) - prompt(2) - borders(~7)
+        log_height = max(8, self.console.height - 9)
         
         lines = self.log_buffer.lines
         total_lines = len(lines)
@@ -168,21 +174,21 @@ class ConsoleUI:
         log_content = Text.from_ansi("\n".join(visible_chunk))
         
         title = f"Logs ({self.scroll_offset})" if self.scroll_offset > 0 else "Logs"
-        layout["logs"].update(Panel(log_content, title=title, border_style="cyan"))
+        layout["logs"].update(Panel(log_content, title=title, border_style="cyan", padding=(0, 1)))
 
         status_table = Table.grid(expand=True)
         status_table.add_column(justify="left")
         status_table.add_column(justify="left")
         status_table.add_row("Running", ", ".join(self.manager.running_bots) or "none")
         status_table.add_row("Available", ", ".join(self.manager.available_bots) or "none")
-        status_table.add_row("Help", "start/stop/reload/status/bots/help/exit/makemigrations/migrate")
-        layout["status"].update(Panel(status_table, title="Status", border_style="magenta"))
+        status_table.add_row("Help", "run/stop/reload/status/bots/help/exit/makemigrations/migrate")
+        layout["status"].update(Panel(status_table, title="Status", border_style="magenta", padding=(0, 1)))
 
         # Add cursor effect
         prompt_content = Text("bot-console> ", style="bold yellow")
         prompt_content.append(command_buffer)
         prompt_content.append("█", style="blink")
-        layout["prompt"].update(Panel(prompt_content, title="Command", border_style="green"))
+        layout["prompt"].update(Panel(prompt_content, title="Command", border_style="green", padding=(0, 1)))
 
         return layout
 
@@ -190,9 +196,9 @@ class ConsoleUI:
 def _print_help(output_func: Callable[[str], None], manager: BotManager) -> None:
     help_lines = [
         "\nCommands:",
-        "  start <bot>   - start a bot",
-        "  stop <bot>    - stop a bot",
-        "  reload <bot>  - stop then start a bot (reload module)",
+        "  run <bot|all>   - start a bot or all bots",
+        "  stop <bot|all>  - stop a bot or all running bots",
+        "  reload <bot>    - stop then start a bot (reload module)",
         "  status        - show running bots",
         "  bots          - list available bots",
         "  help          - show this help",
@@ -203,6 +209,64 @@ def _print_help(output_func: Callable[[str], None], manager: BotManager) -> None
         f"Available bots: {', '.join(manager.available_bots) if manager.available_bots else 'none'}",
     ]
     output_func("\n".join(help_lines))
+
+
+def _complete_command(command_buffer: str, manager: BotManager) -> str:
+    # Simple tab completion for commands and bot names.
+    commands = [
+        "run",
+        "stop",
+        "reload",
+        "status",
+        "bots",
+        "help",
+        "exit",
+        "quit",
+        "makemigrations",
+        "migrate",
+    ]
+    bots = manager.available_bots
+
+    parts = command_buffer.split()
+    if not parts:
+        # Complete to the first command
+        return commands[0] + " "
+
+    # Determine candidate list based on position
+    if len(parts) == 1 and not command_buffer.endswith(" "):
+        prefix = parts[0]
+        candidates = [c for c in commands if c.startswith(prefix)]
+    else:
+        prefix = parts[-1]
+        cmd = parts[0]
+        choices = []
+        if cmd in {"run", "stop", "reload", "makemigrations", "migrate"}:
+            choices = bots
+            if cmd in {"run", "stop"}:
+                choices = ["all"] + bots
+        candidates = [c for c in choices if c.startswith(prefix)]
+
+    if not candidates:
+        return command_buffer
+
+    if len(candidates) == 1:
+        parts[-1] = candidates[0]
+        # Add trailing space if completing the first token (command) or when token now complete.
+        suffix = " " if command_buffer and not command_buffer.endswith(" ") else ""
+        return " ".join(parts) + suffix
+
+    # Multiple candidates: use longest common prefix.
+    common_prefix = candidates[0]
+    for cand in candidates[1:]:
+        i = 0
+        while i < min(len(common_prefix), len(cand)) and common_prefix[i] == cand[i]:
+            i += 1
+        common_prefix = common_prefix[:i]
+    if common_prefix and common_prefix != prefix:
+        parts[-1] = common_prefix
+        return " ".join(parts)
+
+    return command_buffer
 
 
 async def _handle_command(
@@ -236,10 +300,18 @@ async def _handle_command(
         return False
 
     if cmd == "start":
+        cmd = "run"  # backward compatibility
+
+    if cmd == "run":
         if not args:
-            output_func("Usage: start <bot>")
+            output_func("Usage: run <bot|all>")
             return False
         bot_name = args[0]
+        if bot_name == "all":
+            results = await manager.start_all()
+            for line in results:
+                output_func(line)
+            return False
         if bot_name not in manager.available_bots:
             spec = await _load_spec(bot_name, cfg_path, bots_dir, reload_modules=False)
             if spec:
@@ -250,9 +322,14 @@ async def _handle_command(
 
     if cmd == "stop":
         if not args:
-            output_func("Usage: stop <bot>")
+            output_func("Usage: stop <bot|all>")
             return False
-        result = await manager.stop_bot(args[0])
+        bot_name = args[0]
+        if bot_name == "all":
+            await manager.stop_all()
+            output_func("Stopped all bots")
+            return False
+        result = await manager.stop_bot(bot_name)
         output_func(result)
         return False
 
@@ -396,6 +473,9 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
 
                         elif ch == b"\x08":  # Backspace
                             command_buffer = command_buffer[:-1]
+
+                        elif ch == b"\t":  # Tab completion
+                            command_buffer = _complete_command(command_buffer, manager)
                         
                         elif ch == b"\xe0" or ch == b"\x00":  # Arrow keys prefix
                             sc = msvcrt.getch()

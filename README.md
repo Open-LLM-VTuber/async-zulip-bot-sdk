@@ -75,7 +75,7 @@ The SDK comes with a built-in interactive console for managing bots, featuring a
    - **Rich TUI**: Beautiful, split-screen layout for logs, status, and input.
    - **Command History**: Use `Up`/`Down` arrows to navigate previous commands.
    - **Log Scrolling**: Use `PageUp`/`PageDown` to scroll through logs.
-   - **Bot Management**: Start, stop, and reload bots dynamically.
+   - **Bot Management**: Run, stop, and reload bots dynamically.
 
 #### Creating a Single Bot Script
 
@@ -108,7 +108,8 @@ bots:
 Create `bots/echo_bot/bot.yaml` to set prefixes/mentions/help/storage/ORM:
 
 ```yaml
-command_prefixes: ["!", "/"]
+command_prefixes:
+- "!"
 enable_mention_commands: true
 auto_help_command: true
 enable_storage: true
@@ -169,6 +170,14 @@ In this example, you would save it as `bots/echo_bot/__init__.py`.
 ```bash
 python main.py
 ```
+
+After entering the interactive console, use the `run` command to start your bot:
+
+```
+bot-console> run echo_bot
+```
+
+For more commands, type `help` in the console.
 
 ### 📚 Core Concepts
 
