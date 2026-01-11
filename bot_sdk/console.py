@@ -4,6 +4,7 @@ import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterable, Optional, TYPE_CHECKING
+import sys
 from collections import deque
 
 from loguru import logger
@@ -24,6 +25,28 @@ try:  # Optional rich-based UI
     _RICH_AVAILABLE = True
 except Exception:  # pragma: no cover - rich is optional
     _RICH_AVAILABLE = False
+
+try:  # Optional prompt_toolkit-based input for non-Windows platforms
+    from prompt_toolkit import PromptSession
+    from prompt_toolkit.completion import WordCompleter
+
+    _PROMPT_TOOLKIT_AVAILABLE = True
+except Exception:  # pragma: no cover - prompt_toolkit is optional
+    _PROMPT_TOOLKIT_AVAILABLE = False
+
+
+COMMAND_LIST = [
+    "run",
+    "stop",
+    "reload",
+    "status",
+    "bots",
+    "help",
+    "exit",
+    "quit",
+    "makemigrations",
+    "migrate",
+]
 
 
 @dataclass
@@ -213,18 +236,7 @@ def _print_help(output_func: Callable[[str], None], manager: BotManager) -> None
 
 def _complete_command(command_buffer: str, manager: BotManager) -> str:
     # Simple tab completion for commands and bot names.
-    commands = [
-        "run",
-        "stop",
-        "reload",
-        "status",
-        "bots",
-        "help",
-        "exit",
-        "quit",
-        "makemigrations",
-        "migrate",
-    ]
+    commands = COMMAND_LIST
     bots = manager.available_bots
 
     parts = command_buffer.split()
@@ -401,17 +413,13 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
     specs = discover_bot_factories(app_config, bots_dir)
     manager: BotManager = BotManager(specs)
 
-    # Rich-based pretty console with a Live layout and manual input handling via msvcrt.
-    # This avoids blocking I/O and conflicting writes to stdout.
-    use_rich = _RICH_AVAILABLE
-    if use_rich:
+    # Windows: keep Rich-based full-screen console with msvcrt key handling.
+    use_rich_windows = _RICH_AVAILABLE and sys.platform.startswith("win")
+    if use_rich_windows:
         try:
-            import msvcrt
+            import msvcrt  # type: ignore[import]
         except ImportError:
-            # Fallback to basic text mode on non-Windows if needed,
-            # but user environment is Windows log confirmed.
-            print("Rich console requires msvcrt on Windows. Falling back to basic mode.")
-            use_rich = False
+            use_rich_windows = False
         else:
             console = Console()
             log_buffer = LogBuffer(max_lines=1000)
@@ -454,7 +462,7 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
                         if ch == b"\x03":  # Ctrl+C
                             await manager.stop_all()
                             return
-                        elif ch == b"\r" or ch == b"\n":  # Enter
+                        elif ch in {b"\r", b"\n"}:  # Enter
                             cmd = command_buffer
                             command_buffer = ""
                             history_idx = 0
@@ -476,8 +484,8 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
 
                         elif ch == b"\t":  # Tab completion
                             command_buffer = _complete_command(command_buffer, manager)
-                        
-                        elif ch == b"\xe0" or ch == b"\x00":  # Arrow keys prefix
+
+                        elif ch in {b"\xe0", b"\x00"}:  # Arrow keys prefix
                             sc = msvcrt.getch()
                             if sc == b"H":  # Up
                                 if history_idx < len(command_history):
@@ -496,11 +504,11 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
                                 else:
                                     command_buffer = ""
                                     history_idx = 0
-                            elif sc == b"I": # Page Up
+                            elif sc == b"I":  # Page Up
                                 ui.scroll_offset += 5
-                            elif sc == b"Q": # Page Down
+                            elif sc == b"Q":  # Page Down
                                 ui.scroll_offset = max(0, ui.scroll_offset - 5)
-                                
+
                         else:
                             try:
                                 # Normal char decoding
@@ -513,14 +521,39 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
                     # Update UI
                     # We always refresh to animate the cursor blink or show new logs
                     live.update(ui.render(command_buffer), refresh=True)
-                    
+
                     # Yield to event loop
                     await asyncio.sleep(0.05)
-            
+
             await manager.stop_all()
             return
 
-    # Basic text console fallback when rich is not installed.
+    # Non-Windows or when Rich fullscreen is unavailable: prefer prompt_toolkit if installed.
+    if _PROMPT_TOOLKIT_AVAILABLE:
+        # Basic word completer: commands + bot names + 'all'
+        words = set(COMMAND_LIST)
+        words.update(manager.available_bots)
+        words.add("all")
+        completer = WordCompleter(sorted(words), ignore_case=True)
+        session = PromptSession(completer=completer)
+
+        print("Async Zulip Bot Console (prompt_toolkit). Type 'help' for commands.")
+        _print_help(print, manager)
+        while True:
+            try:
+                raw = await session.prompt_async("bot-console> ")
+            except (EOFError, KeyboardInterrupt):
+                print("Exiting console...")
+                break
+            if not raw.strip():
+                continue
+            should_exit = await _handle_command(raw, manager, cfg_path, bots_dir, print)
+            if should_exit:
+                break
+        await manager.stop_all()
+        return
+
+    # Final fallback when neither Rich+msvcrt nor prompt_toolkit are available.
     print("Async Zulip Bot Console (basic). Type 'help' for commands.")
     _print_help(print, manager)
     while True:
