@@ -172,18 +172,21 @@ await cache.flush()  # Usually called automatically by the context manager
 
 ## Configuration
 
-### Custom storage path
+> ⚠️ Since v1.0.0, storage-related flags such as `enable_storage` and `storage_path` are loaded from each bot's `bot.yaml` (`BotLocalConfig`). Class-level attributes are ignored.
 
-```python
-class MyBot(BaseBot):
-    storage_path = "data/my_bot.db"  # Custom path
+### Custom storage path (bot.yaml)
+
+```yaml
+# bots/my_bot/bot.yaml
+enable_storage: true
+storage_path: "data/my_bot.db"  # Custom KV database path
 ```
 
-### Disable storage
+### Disable storage (bot.yaml)
 
-```python
-class MyBot(BaseBot):
-    enable_storage = False  # Turn off storage entirely
+```yaml
+# bots/my_bot/bot.yaml
+enable_storage: false  # Turn off storage entirely
 ```
 
 ### Custom serialization

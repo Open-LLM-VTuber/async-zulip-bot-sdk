@@ -4,24 +4,33 @@
 
 ## BotLocalConfig（Per-Bot 本地设置）
 
-存储在 `bot.yaml`（与 bot 模块在同一目录）。字段说明：
+存储在每个 Bot 目录下的 `bot.yaml`（与 bot 模块在同一目录）。
 
+> ⚠️ 重大变更：自 v1.0.0 起，Bot 的运行时配置**只从 `bot.yaml` 读取**。原来的类属性（例如 `command_prefixes`、`enable_mention_commands`、`auto_help_command`、`enable_storage`、`enable_orm` 等）不再生效，请全部迁移到 YAML。
+
+字段说明（含默认值）：
+
+- `command_prefixes` (list[str]，默认 `['!']`)：命令前缀列表。
+- `enable_mention_commands` (bool，默认 `true`)：是否将 @-提及视为命令触发器。
+- `auto_help_command` (bool，默认 `true`)：是否自动注册内置 help 命令。
+- `enable_storage` (bool，默认 `true`)：是否启用 KV 存储。
+- `storage_path` (str，可选)：自定义 KV 存储路径；默认 `bot_data/<bot>.db`。
+- `storage` (`StorageConfig`，默认对象)：KV 缓存与自动 flush 行为配置。
+- `enable_orm` (bool，默认 `false`)：是否启用 ORM；如果启用且未设置 `orm_db_path`，则复用存储数据库文件。
+- `orm_db_path` (str，可选)：单独的 ORM 数据库路径。
 - `owner_user_id` (int，可选)：显式指定 bot 所有者（Zulip user_id），独立于组织 owner/admin。
-- `language` (str，默认 `"en"`)：此 bot 的默认语言/地区代码（如 `"en"`, `"zh"`）。控制 i18n 系统加载哪个翻译文件。
-- `role_levels` (dict[str, int])：角色名到权限等级的映射。默认：
-  - `user`: 1
-  - `admin`: 50
-  - `owner`: 100
-  - `bot_owner`: 200
-  
-  等级越高权限越大。用于检查带 `min_level` 的命令。可按 bot 自定义。
-  
+- `language` (str，默认 `"en"`)：此 bot 的默认语言/地区代码（如 `"en"`, `"zh"`），用于 i18n。
+- `role_levels` (dict[str, int]，默认 `{user:1, admin:50, owner:100, bot_owner:200}`)：角色名到权限等级的映射，等级越高权限越大。
 - `settings` (dict，默认 `{}`)：其他 bot 特定的任意键值对。
 
 **示例 `bot.yaml`**：
 
 ```yaml
-owner_user_id: 42
+command_prefixes: ["!", "/"]
+enable_mention_commands: true
+auto_help_command: true
+enable_storage: true
+enable_orm: false
 language: zh
 role_levels:
   user: 1

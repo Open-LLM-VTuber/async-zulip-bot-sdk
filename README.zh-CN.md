@@ -59,27 +59,7 @@ pip install -e .
 
 ### 🚀 快速开始
 
-> ⚠️ 重大变更（下一主版本）：Bot 配置仅从各自的 `bot.yaml` 读取，类属性（如 `command_prefixes`、`enable_storage`、`enable_orm`）不再生效。请在该 Bot 的 YAML 中设置前缀/提及/help/存储/ORM 等选项。
-
-#### 交互式控制台（推荐）
-
-本 SDK 内置了一个功能强大的交互式控制台，用于管理 Bot，基于 `rich` 提供了美观的 TUI（文本用户界面）。
-
-1. **运行控制台**：
-   ```bash
-   python main.py
-   ```
-
-   **主要功能：**
-   - **Rich TUI**：美观的分屏布局，同时显示日志、状态和输入框。
-   - **命令历史**：使用 `上`/`下` 箭头键浏览历史命令。
-   - **日志滚动**：使用 `PageUp`/`PageDown` 键滚动查看历史日志。
-   - **Bot 管理**：动态启动、停止和重载 Bot。
-    - **Tab 补全**：按 `Tab` 键自动补全命令和 Bot 名称。
-
-#### 创建单文件 Bot
-
-如果您只需要一个简单的脚本，不需要管理器：
+> ⚠️ 重大变更（自 v1.0.0 起）：Bot 配置仅从各自的 `bot.yaml` 读取，类属性（如 `command_prefixes`、`enable_storage`、`enable_orm`）不再生效。请在该 Bot 的 YAML 中设置前缀/提及/help/存储/ORM 等选项。
 
 #### 1. 配置 Zulip 凭据
 
@@ -165,15 +145,33 @@ BOT_CLASS = MyBot
 
 #### 5. 运行机器人
 
+**交互式控制台**
+
+本 SDK 内置了一个功能强大的交互式控制台，用于管理 Bot，基于 `rich` 提供了美观的 TUI（文本用户界面）。
+
+**运行控制台**：
 ```bash
+# 永远不要忘记激活你的虚拟环境
+# .venv\Scripts\activate # Windows
+# source .venv/bin/activate # macOS/Linux
+
 python main.py
 ```
+
+**主要功能：**
+- **Rich TUI**：美观的分屏布局，同时显示日志、状态和输入框。
+- **命令历史**：使用 `上`/`下` 箭头键浏览历史命令。
+- **日志滚动**：使用 `PageUp`/`PageDown` 键滚动查看历史日志。
+- **Bot 管理**：动态启动、停止和重载 Bot。
+- **Tab 补全**：按 `Tab` 键自动补全命令和 Bot 名称。
 
 进入交互式控制台后，使用 run 命令启动你的机器人：
 
 ```
 bot-console> run echo_bot
 ```
+
+记得使用 tab 键补全命令和机器人名称以提高效率。
 
 你可以使用 help 命令查看更多控制台命令。
 
@@ -254,11 +252,13 @@ class MyBot(BaseBot):
 
 #### 自定义命令前缀和提及检测
 
-> ⚠️ 注意：从下一主版本开始，配置应在 `bot.yaml` 中设置，而非类属性。
+配置现在统一在每个 Bot 的 `bot.yaml` 中完成，类属性将被忽略。
 
 在 `bot.yaml` 中配置：
 ```yaml
-command_prefixes: ["!", "/", "."]
+command_prefixes:
+- "!"
+- "/"  # 不推荐使用 '/'，因为它是 Zulip 官方命令前缀
 enable_mention_commands: true  # 启用 @bot 触发命令
 ```
 
