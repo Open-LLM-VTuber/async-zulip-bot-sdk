@@ -431,8 +431,8 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
                                 char_str = ch.decode("utf-8", "ignore")
                                 if char_str and ord(char_str) >= 32:
                                     command_buffer += char_str
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                logger.debug("Failed to decode character: {}", e)
 
                     # Update UI
                     # We always refresh to animate the cursor blink or show new logs
