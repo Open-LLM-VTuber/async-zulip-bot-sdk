@@ -339,27 +339,19 @@ def _command_help_state(command_buffer: str, bots: list[str]) -> str:
     if cmd in {"status", "bots", "help", "exit", "quit"}:
         return "Do it!"
 
+    # Commands requiring one argument
+    if len(parts) < 2:
+        return "Error!"
+
+    target = parts[1]
+
     # Commands requiring a target bot/all
     if cmd in {"run", "stop"}:
-        if len(parts) < 2:
-            return "Error!"
-        target = parts[1]
         return "Do it!" if (target == "all" or target in bots) else "Error!"
 
-    if cmd == "reload":
-        if len(parts) < 2:
-            return "Error!"
-        return "Do it!" if parts[1] in bots else "Error!"
-
-    if cmd == "makemigrations":
-        if len(parts) < 2:
-            return "Error!"
-        return "Do it!" if parts[1] in bots else "Error!"
-
-    if cmd == "migrate":
-        if len(parts) < 2:
-            return "Error!"
-        return "Do it!" if parts[1] in bots else "Error!"
+    # Commands requiring a bot name
+    if cmd in {"reload", "makemigrations", "migrate"}:
+        return "Do it!" if target in bots else "Error!"
 
     return ""
 
@@ -368,17 +360,18 @@ def _render_help_cell(help_text: str, help_state: str):
     """Render the status Help cell with simple precedence to stay readable."""
     if help_state == "Do it!":
         return Text(help_state, style="bold green")
-    if help_state == "Error!" and not help_text:
+
+    if help_state == "Error!":
+        if help_text:
+            txt = Text(help_text)
+            txt.append("  ")
+            txt.append(help_state, style="bold red")
+            return txt
         return Text(help_state, style="bold red")
-    if help_text and help_state:
-        txt = Text(help_text)
-        txt.append("  ")
-        txt.append(help_state, style="bold green" if help_state == "Do it!" else "bold red")
-        return txt
+
     if help_text:
         return help_text
-    if help_state:
-        return Text(help_state, style="bold green" if help_state == "Do it!" else "bold red")
+
     return "-"
 
 
