@@ -75,6 +75,7 @@ pip install -e .
    - **命令历史**：使用 `上`/`下` 箭头键浏览历史命令。
    - **日志滚动**：使用 `PageUp`/`PageDown` 键滚动查看历史日志。
    - **Bot 管理**：动态启动、停止和重载 Bot。
+    - **Tab 补全**：按 `Tab` 键自动补全命令和 Bot 名称。
 
 #### 创建单文件 Bot
 
@@ -106,7 +107,8 @@ bots:
 在 `bots/echo_bot/bot.yaml` 里设置前缀/提及/help/存储/ORM 等：
 
 ```yaml
-command_prefixes: ["!", "/"]
+command_prefixes:
+- "!"
 enable_mention_commands: true
 auto_help_command: true
 enable_storage: true
@@ -166,6 +168,14 @@ BOT_CLASS = MyBot
 ```bash
 python main.py
 ```
+
+进入交互式控制台后，使用 run 命令启动你的机器人：
+
+```
+bot-console> run echo_bot
+```
+
+你可以使用 help 命令查看更多控制台命令。
 
 ### 📚 核心概念
 

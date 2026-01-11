@@ -4,6 +4,8 @@ import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterable, Optional, TYPE_CHECKING
+import sys
+from collections import deque
 
 from loguru import logger
 
@@ -23,6 +25,42 @@ try:  # Optional rich-based UI
     _RICH_AVAILABLE = True
 except Exception:  # pragma: no cover - rich is optional
     _RICH_AVAILABLE = False
+
+try:  # Optional prompt_toolkit-based input for non-Windows platforms
+    from prompt_toolkit import PromptSession
+    from prompt_toolkit.completion import WordCompleter
+
+    _PROMPT_TOOLKIT_AVAILABLE = True
+except Exception:  # pragma: no cover - prompt_toolkit is optional
+    _PROMPT_TOOLKIT_AVAILABLE = False
+
+
+COMMAND_LIST = [
+    "run",
+    "stop",
+    "reload",
+    "status",
+    "bots",
+    "help",
+    "exit",
+    "quit",
+    "makemigrations",
+    "migrate",
+]
+
+
+COMMAND_LIST = [
+    "run",
+    "stop",
+    "reload",
+    "status",
+    "bots",
+    "help",
+    "exit",
+    "quit",
+    "makemigrations",
+    "migrate",
+]
 
 
 @dataclass
@@ -49,6 +87,12 @@ class BotManager:
     def set_spec(self, spec: BotSpec) -> None:
         self._specs[spec.name] = spec
 
+    async def start_all(self) -> list[str]:
+        tasks = [self.start_bot(name) for name in self.available_bots]
+        results = await asyncio.gather(*tasks)
+        return results
+
+
     async def start_bot(self, name: str) -> str:
         async with self._lock:
             if name in self._running:
@@ -68,7 +112,7 @@ class BotManager:
 
         async with self._lock:
             self._running[name] = managed
-        return f"Started bot '{name}'"
+        return f"Starting bot '{name}'"
 
     async def _run_runner(self, name: str, managed: ManagedBot) -> None:
         try:
@@ -145,13 +189,13 @@ class ConsoleUI:
         layout = Layout()
         layout.split_column(
             Layout(name="logs", ratio=3),
-            Layout(name="status", size=6),
+            Layout(name="status", size=5),
             Layout(name="prompt", size=3),
         )
 
         # Calculate visible log lines based on console height
-        # Approx height available for logs = total - status(6) - prompt(3) - borders(6)
-        log_height = max(10, self.console.height - 15)
+        # Approx height available for logs = total - status(5) - prompt(2) - borders(~7)
+        log_height = max(8, self.console.height - 9)
         
         lines = self.log_buffer.lines
         total_lines = len(lines)
@@ -167,21 +211,24 @@ class ConsoleUI:
         log_content = Text.from_ansi("\n".join(visible_chunk))
         
         title = f"Logs ({self.scroll_offset})" if self.scroll_offset > 0 else "Logs"
-        layout["logs"].update(Panel(log_content, title=title, border_style="cyan"))
+        layout["logs"].update(Panel(log_content, title=title, border_style="cyan", padding=(0, 1)))
 
-        status_table = Table.grid(expand=True)
-        status_table.add_column(justify="left")
-        status_table.add_column(justify="left")
-        status_table.add_row("Running", ", ".join(self.manager.running_bots) or "none")
-        status_table.add_row("Available", ", ".join(self.manager.available_bots) or "none")
-        status_table.add_row("Help", "start/stop/reload/status/bots/help/exit/makemigrations/migrate")
-        layout["status"].update(Panel(status_table, title="Status", border_style="magenta"))
+        status_table = Table.grid(expand=True, padding=(0, 10))
+        status_table.add_column(justify="left", no_wrap=True, style="bold")
+        status_table.add_column(justify="left", ratio=1, no_wrap=False)
+        status_table.add_row("Running", ", ".join(self.manager.running_bots) or "none", style="green")
+        status_table.add_row("Available", ", ".join(self.manager.available_bots) or "none", style="cyan")
+        help_text = _command_help_suggestions(command_buffer, self.manager.available_bots)
+        help_state = _command_help_state(command_buffer, self.manager.available_bots)
+        help_cell = _render_help_cell(help_text, help_state)
+        status_table.add_row("Command Help", help_cell, style="magenta")
+        layout["status"].update(Panel(status_table, title="Status", border_style="magenta", padding=(0, 1)))
 
         # Add cursor effect
         prompt_content = Text("bot-console> ", style="bold yellow")
         prompt_content.append(command_buffer)
         prompt_content.append("█", style="blink")
-        layout["prompt"].update(Panel(prompt_content, title="Command", border_style="green"))
+        layout["prompt"].update(Panel(prompt_content, title="Command", border_style="green", padding=(0, 1)))
 
         return layout
 
@@ -189,9 +236,9 @@ class ConsoleUI:
 def _print_help(output_func: Callable[[str], None], manager: BotManager) -> None:
     help_lines = [
         "\nCommands:",
-        "  start <bot>   - start a bot",
-        "  stop <bot>    - stop a bot",
-        "  reload <bot>  - stop then start a bot (reload module)",
+        "  run <bot|all>   - start a bot or all bots",
+        "  stop <bot|all>  - stop a bot or all running bots",
+        "  reload <bot>    - stop then start a bot (reload module)",
         "  status        - show running bots",
         "  bots          - list available bots",
         "  help          - show this help",
@@ -202,6 +249,153 @@ def _print_help(output_func: Callable[[str], None], manager: BotManager) -> None
         f"Available bots: {', '.join(manager.available_bots) if manager.available_bots else 'none'}",
     ]
     output_func("\n".join(help_lines))
+
+
+def _complete_command(command_buffer: str, manager: BotManager) -> str:
+    # Simple tab completion for commands and bot names.
+    commands = COMMAND_LIST
+    bots = manager.available_bots
+
+    parts = command_buffer.split()
+    if not parts:
+        # Complete to the first command
+        return commands[0] + " "
+
+    # Determine candidate list based on position
+    if len(parts) == 1 and not command_buffer.endswith(" "):
+        # Completing command name
+        prefix = parts[0]
+        candidates = [c for c in commands if c.startswith(prefix)]
+    elif len(parts) == 1 and command_buffer.endswith(" "):
+        # Command chosen, completing first argument
+        cmd = parts[0]
+        choices = _choices_for_command(cmd, bots)
+        candidates = choices
+        prefix = ""
+    else:
+        prefix = parts[-1]
+        cmd = parts[0]
+        choices = _choices_for_command(cmd, bots)
+        candidates = [c for c in choices if c.startswith(prefix)]
+
+    if not candidates:
+        return command_buffer
+
+    if len(candidates) == 1:
+        # If we're completing an argument right after a space, append; otherwise replace token.
+        if len(parts) == 1 and command_buffer.endswith(" "):
+            return command_buffer + candidates[0] + " "
+        parts[-1] = candidates[0]
+        suffix = " " if command_buffer and not command_buffer.endswith(" ") else ""
+        return " ".join(parts) + suffix
+
+    # Multiple candidates: use longest common prefix.
+    if prefix == "" and len(candidates) > 0:
+        # No prefix typed; insert the first candidate.
+        return command_buffer + candidates[0] + " "
+
+    common_prefix = candidates[0]
+    for cand in candidates[1:]:
+        i = 0
+        while i < min(len(common_prefix), len(cand)) and common_prefix[i] == cand[i]:
+            i += 1
+        common_prefix = common_prefix[:i]
+    if common_prefix and common_prefix != prefix:
+        parts[-1] = common_prefix
+        return " ".join(parts)
+
+    return command_buffer
+
+
+def _choices_for_command(cmd: str, bots: list[str]) -> list[str]:
+    if cmd in {"run", "stop"}:
+        return ["all"] + bots
+    if cmd in {"reload", "makemigrations", "migrate"}:
+        return bots
+    return []
+
+
+def _command_help_suggestions(command_buffer: str, bots: list[str]) -> str:
+    """Display filtered commands/arguments in the Status panel based on current input."""
+    buf = (command_buffer or "").lstrip()
+    if not buf:
+        return "/".join(COMMAND_LIST)
+
+    parts = buf.split()
+    cmd_prefix = parts[0]
+
+    # Still typing the command name (no space yet)
+    if len(parts) == 1 and not buf.endswith(" "):
+        matches = [c for c in COMMAND_LIST if c.startswith(cmd_prefix)]
+        return "/".join(matches) if matches else ""
+
+    # Command selected; suggest arguments
+    cmd = cmd_prefix
+    arg_prefix = parts[1] if len(parts) > 1 else ""
+    choices = _choices_for_command(cmd, bots)
+    if not choices:
+        return ""
+
+    if arg_prefix:
+        matches = [c for c in choices if c.startswith(arg_prefix)]
+    else:
+        matches = choices
+
+    if len(matches) == 1 and matches[0] == arg_prefix:
+        return ""
+
+    return "/".join(matches) if matches else ""
+
+
+def _command_help_state(command_buffer: str, bots: list[str]) -> str:
+    """Return Do it! when the current buffer is runnable, Error! when invalid."""
+    buf = (command_buffer or "").strip()
+    if not buf:
+        return ""
+
+    parts = buf.split()
+    cmd = parts[0]
+    if cmd not in COMMAND_LIST:
+        return "Error!"
+
+    # Commands with no args required
+    if cmd in {"status", "bots", "help", "exit", "quit"}:
+        return "Do it!"
+
+    # Commands requiring one argument
+    if len(parts) < 2:
+        return "Error!"
+
+    target = parts[1]
+
+    # Commands requiring a target bot/all
+    if cmd in {"run", "stop"}:
+        return "Do it!" if (target == "all" or target in bots) else "Error!"
+
+    # Commands requiring a bot name
+    if cmd in {"reload", "makemigrations", "migrate"}:
+        return "Do it!" if target in bots else "Error!"
+
+    return ""
+
+
+def _render_help_cell(help_text: str, help_state: str):
+    """Render the status Help cell with simple precedence to stay readable."""
+    if help_state == "Do it!":
+        return Text(help_state, style="bold green")
+
+    if help_state == "Error!":
+        if help_text:
+            txt = Text(help_text)
+            txt.append("  ")
+            txt.append(help_state, style="bold red")
+            return txt
+        return Text(help_state, style="bold red")
+
+    if help_text:
+        return help_text
+
+    return "-"
 
 
 async def _handle_command(
@@ -235,10 +429,18 @@ async def _handle_command(
         return False
 
     if cmd == "start":
+        cmd = "run"  # backward compatibility
+
+    if cmd == "run":
         if not args:
-            output_func("Usage: start <bot>")
+            output_func("Usage: run <bot|all>")
             return False
         bot_name = args[0]
+        if bot_name == "all":
+            results = await manager.start_all()
+            for line in results:
+                output_func(line)
+            return False
         if bot_name not in manager.available_bots:
             spec = await _load_spec(bot_name, cfg_path, bots_dir, reload_modules=False)
             if spec:
@@ -249,9 +451,19 @@ async def _handle_command(
 
     if cmd == "stop":
         if not args:
-            output_func("Usage: stop <bot>")
+            output_func("Usage: stop <bot|all>")
             return False
-        result = await manager.stop_bot(args[0])
+        bot_name = args[0]
+        if bot_name == "all":
+            results = await manager.stop_all()
+            if results:
+                for line in results:
+                    output_func(line)
+            else:
+                output_func("No running bots to stop.")
+            return False
+
+        result = await manager.stop_bot(bot_name)
         output_func(result)
         return False
 
@@ -323,17 +535,13 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
     specs = discover_bot_factories(app_config, bots_dir)
     manager: BotManager = BotManager(specs)
 
-    # Rich-based pretty console with a Live layout and manual input handling via msvcrt.
-    # This avoids blocking I/O and conflicting writes to stdout.
-    use_rich = _RICH_AVAILABLE
-    if use_rich:
+    # Windows: keep Rich-based full-screen console with msvcrt key handling.
+    use_rich_windows = _RICH_AVAILABLE and sys.platform.startswith("win")
+    if use_rich_windows:
         try:
-            import msvcrt
+            import msvcrt  # type: ignore[import]
         except ImportError:
-            # Fallback to basic text mode on non-Windows if needed,
-            # but user environment is Windows log confirmed.
-            print("Rich console requires msvcrt on Windows. Falling back to basic mode.")
-            use_rich = False
+            use_rich_windows = False
         else:
             console = Console()
             log_buffer = LogBuffer(max_lines=1000)
@@ -376,7 +584,7 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
                         if ch == b"\x03":  # Ctrl+C
                             await manager.stop_all()
                             return
-                        elif ch == b"\r" or ch == b"\n":  # Enter
+                        elif ch in {b"\r", b"\n"}:  # Enter
                             cmd = command_buffer
                             command_buffer = ""
                             history_idx = 0
@@ -395,8 +603,11 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
 
                         elif ch == b"\x08":  # Backspace
                             command_buffer = command_buffer[:-1]
-                        
-                        elif ch == b"\xe0" or ch == b"\x00":  # Arrow keys prefix
+
+                        elif ch == b"\t":  # Tab completion
+                            command_buffer = _complete_command(command_buffer, manager)
+
+                        elif ch in {b"\xe0", b"\x00"}:  # Arrow keys prefix
                             sc = msvcrt.getch()
                             if sc == b"H":  # Up
                                 if history_idx < len(command_history):
@@ -415,11 +626,11 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
                                 else:
                                     command_buffer = ""
                                     history_idx = 0
-                            elif sc == b"I": # Page Up
+                            elif sc == b"I":  # Page Up
                                 ui.scroll_offset += 5
-                            elif sc == b"Q": # Page Down
+                            elif sc == b"Q":  # Page Down
                                 ui.scroll_offset = max(0, ui.scroll_offset - 5)
-                                
+
                         else:
                             try:
                                 # Normal char decoding
@@ -432,14 +643,39 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
                     # Update UI
                     # We always refresh to animate the cursor blink or show new logs
                     live.update(ui.render(command_buffer), refresh=True)
-                    
+
                     # Yield to event loop
                     await asyncio.sleep(0.05)
-            
+
             await manager.stop_all()
             return
 
-    # Basic text console fallback when rich is not installed.
+    # Non-Windows or when Rich fullscreen is unavailable: prefer prompt_toolkit if installed.
+    if _PROMPT_TOOLKIT_AVAILABLE:
+        # Basic word completer: commands + bot names + 'all'
+        words = set(COMMAND_LIST)
+        words.update(manager.available_bots)
+        words.add("all")
+        completer = WordCompleter(sorted(words), ignore_case=True)
+        session = PromptSession(completer=completer)
+
+        print("Async Zulip Bot Console (prompt_toolkit). Type 'help' for commands.")
+        _print_help(print, manager)
+        while True:
+            try:
+                raw = await session.prompt_async("bot-console> ")
+            except (EOFError, KeyboardInterrupt):
+                print("Exiting console...")
+                break
+            if not raw.strip():
+                continue
+            should_exit = await _handle_command(raw, manager, cfg_path, bots_dir, print)
+            if should_exit:
+                break
+        await manager.stop_all()
+        return
+
+    # Final fallback when neither Rich+msvcrt nor prompt_toolkit are available.
     print("Async Zulip Bot Console (basic). Type 'help' for commands.")
     _print_help(print, manager)
     while True:
