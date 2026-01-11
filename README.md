@@ -76,6 +76,7 @@ The SDK comes with a built-in interactive console for managing bots, featuring a
    - **Command History**: Use `Up`/`Down` arrows to navigate previous commands.
    - **Log Scrolling**: Use `PageUp`/`PageDown` to scroll through logs.
    - **Bot Management**: Run, stop, and reload bots dynamically.
+   - **Tab Completion**: Press `Tab` to auto-complete commands and bot names.
 
 #### Creating a Single Bot Script
 
