@@ -26,6 +26,20 @@ except Exception:  # pragma: no cover - rich is optional
     _RICH_AVAILABLE = False
 
 
+COMMAND_LIST = [
+    "run",
+    "stop",
+    "reload",
+    "status",
+    "bots",
+    "help",
+    "exit",
+    "quit",
+    "makemigrations",
+    "migrate",
+]
+
+
 @dataclass
 class ManagedBot:
     spec: BotSpec
@@ -176,12 +190,15 @@ class ConsoleUI:
         title = f"Logs ({self.scroll_offset})" if self.scroll_offset > 0 else "Logs"
         layout["logs"].update(Panel(log_content, title=title, border_style="cyan", padding=(0, 1)))
 
-        status_table = Table.grid(expand=True)
-        status_table.add_column(justify="left")
-        status_table.add_column(justify="left")
-        status_table.add_row("Running", ", ".join(self.manager.running_bots) or "none")
-        status_table.add_row("Available", ", ".join(self.manager.available_bots) or "none")
-        status_table.add_row("Help", "run/stop/reload/status/bots/help/exit/makemigrations/migrate")
+        status_table = Table.grid(expand=True, padding=(0, 10))
+        status_table.add_column(justify="left", no_wrap=True, style="bold")
+        status_table.add_column(justify="left", ratio=1, no_wrap=False)
+        status_table.add_row("Running", ", ".join(self.manager.running_bots) or "none", style="green")
+        status_table.add_row("Available", ", ".join(self.manager.available_bots) or "none", style="cyan")
+        help_text = _command_help_suggestions(command_buffer, self.manager.available_bots)
+        help_state = _command_help_state(command_buffer, self.manager.available_bots)
+        help_cell = _render_help_cell(help_text, help_state)
+        status_table.add_row("Command Help", help_cell, style="magenta")
         layout["status"].update(Panel(status_table, title="Status", border_style="magenta", padding=(0, 1)))
 
         # Add cursor effect
@@ -213,18 +230,7 @@ def _print_help(output_func: Callable[[str], None], manager: BotManager) -> None
 
 def _complete_command(command_buffer: str, manager: BotManager) -> str:
     # Simple tab completion for commands and bot names.
-    commands = [
-        "run",
-        "stop",
-        "reload",
-        "status",
-        "bots",
-        "help",
-        "exit",
-        "quit",
-        "makemigrations",
-        "migrate",
-    ]
+    commands = COMMAND_LIST
     bots = manager.available_bots
 
     parts = command_buffer.split()
@@ -234,28 +240,37 @@ def _complete_command(command_buffer: str, manager: BotManager) -> str:
 
     # Determine candidate list based on position
     if len(parts) == 1 and not command_buffer.endswith(" "):
+        # Completing command name
         prefix = parts[0]
         candidates = [c for c in commands if c.startswith(prefix)]
+    elif len(parts) == 1 and command_buffer.endswith(" "):
+        # Command chosen, completing first argument
+        cmd = parts[0]
+        choices = _choices_for_command(cmd, bots)
+        candidates = choices
+        prefix = ""
     else:
         prefix = parts[-1]
         cmd = parts[0]
-        choices = []
-        if cmd in {"run", "stop", "reload", "makemigrations", "migrate"}:
-            choices = bots
-            if cmd in {"run", "stop"}:
-                choices = ["all"] + bots
+        choices = _choices_for_command(cmd, bots)
         candidates = [c for c in choices if c.startswith(prefix)]
 
     if not candidates:
         return command_buffer
 
     if len(candidates) == 1:
+        # If we're completing an argument right after a space, append; otherwise replace token.
+        if len(parts) == 1 and command_buffer.endswith(" "):
+            return command_buffer + candidates[0] + " "
         parts[-1] = candidates[0]
-        # Add trailing space if completing the first token (command) or when token now complete.
         suffix = " " if command_buffer and not command_buffer.endswith(" ") else ""
         return " ".join(parts) + suffix
 
     # Multiple candidates: use longest common prefix.
+    if prefix == "" and len(candidates) > 0:
+        # No prefix typed; insert the first candidate.
+        return command_buffer + candidates[0] + " "
+
     common_prefix = candidates[0]
     for cand in candidates[1:]:
         i = 0
@@ -267,6 +282,97 @@ def _complete_command(command_buffer: str, manager: BotManager) -> str:
         return " ".join(parts)
 
     return command_buffer
+
+
+def _choices_for_command(cmd: str, bots: list[str]) -> list[str]:
+    if cmd in {"run", "stop"}:
+        return ["all"] + bots
+    if cmd in {"reload", "makemigrations", "migrate"}:
+        return bots
+    return []
+
+
+def _command_help_suggestions(command_buffer: str, bots: list[str]) -> str:
+    """Display filtered commands/arguments in the Status panel based on current input."""
+    buf = (command_buffer or "").lstrip()
+    if not buf:
+        return "/".join(COMMAND_LIST)
+
+    parts = buf.split()
+    cmd_prefix = parts[0]
+
+    # Still typing the command name (no space yet)
+    if len(parts) == 1 and not buf.endswith(" "):
+        matches = [c for c in COMMAND_LIST if c.startswith(cmd_prefix)]
+        return "/".join(matches) if matches else ""
+
+    # Command selected; suggest arguments
+    cmd = cmd_prefix
+    arg_prefix = parts[1] if len(parts) > 1 else ""
+    choices = _choices_for_command(cmd, bots)
+    if not choices:
+        return ""
+
+    if arg_prefix:
+        matches = [c for c in choices if c.startswith(arg_prefix)]
+    else:
+        matches = choices
+
+    if len(matches) == 1 and matches[0] == arg_prefix:
+        return ""
+
+    return "/".join(matches) if matches else ""
+
+
+def _command_help_state(command_buffer: str, bots: list[str]) -> str:
+    """Return Do it! when the current buffer is runnable, Error! when invalid."""
+    buf = (command_buffer or "").strip()
+    if not buf:
+        return ""
+
+    parts = buf.split()
+    cmd = parts[0]
+    if cmd not in COMMAND_LIST:
+        return "Error!"
+
+    # Commands with no args required
+    if cmd in {"status", "bots", "help", "exit", "quit"}:
+        return "Do it!"
+
+    # Commands requiring one argument
+    if len(parts) < 2:
+        return "Error!"
+
+    target = parts[1]
+
+    # Commands requiring a target bot/all
+    if cmd in {"run", "stop"}:
+        return "Do it!" if (target == "all" or target in bots) else "Error!"
+
+    # Commands requiring a bot name
+    if cmd in {"reload", "makemigrations", "migrate"}:
+        return "Do it!" if target in bots else "Error!"
+
+    return ""
+
+
+def _render_help_cell(help_text: str, help_state: str):
+    """Render the status Help cell with simple precedence to stay readable."""
+    if help_state == "Do it!":
+        return Text(help_state, style="bold green")
+
+    if help_state == "Error!":
+        if help_text:
+            txt = Text(help_text)
+            txt.append("  ")
+            txt.append(help_state, style="bold red")
+            return txt
+        return Text(help_state, style="bold red")
+
+    if help_text:
+        return help_text
+
+    return "-"
 
 
 async def _handle_command(
