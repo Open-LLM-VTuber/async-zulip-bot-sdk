@@ -4,6 +4,7 @@ import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterable, Optional, TYPE_CHECKING
+from collections import deque
 
 from loguru import logger
 
