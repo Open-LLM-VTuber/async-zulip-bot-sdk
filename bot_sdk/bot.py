@@ -225,11 +225,13 @@ class BaseBot(abc.ABC):
             )
         )
         # Built-in: stop (bot shutdown)
+        stop_min_level = default_levels.get("admin", 50)
         self.command_parser.register_spec(
             CommandSpec(
                 name="stop",
                 description="Stop the bot",
                 handler=self._handle_stop,
+                min_level=stop_min_level,
             )
         )
         # Hook for subclasses
@@ -295,7 +297,8 @@ class BaseBot(abc.ABC):
         except Exception:
             pass
         text = (
-            f"👤 {message.sender_full_name} (id={user_id})\n"
+            "👤 User info\n"
+            f"User: {message.sender_full_name} (id={user_id})\n"
             f"Roles: {', '.join(sorted(set(roles)))}\n"
             f"Level: {level}"
         )
@@ -418,6 +421,15 @@ class BaseBot(abc.ABC):
         else:
             logger.warning("Stop requested but runner reference is missing; bot may keep running")
 
+    async def get_user_level(self, user_id: int) -> int:
+        """Public helper for resolving a user's permission level.
+
+        Used by the built-in help command to hide commands that
+        require a higher level than the caller.
+        """
+
+        return await self._compute_user_level(user_id)
+
     async def _compute_user_level(self, user_id: int) -> int:
         role_levels = (self.settings.role_levels if self.settings else {"user": 1, "admin": 50, "owner": 100, "bot_owner": 200})
         level = role_levels.get("user", 1)
@@ -457,6 +469,37 @@ class BaseBot(abc.ABC):
             if event.message.sender_id == self._user_id:
                 logger.debug("Ignoring message from self")
                 return  # Ignore messages from ourselves
+            # Early permission check based on command name only, so that
+            # users without sufficient level get a clear denial even if
+            # their arguments are missing or malformed.
+            try:
+                raw_text = (event.message.content or "").strip()
+                if raw_text:
+                    stripped = self.command_parser._strip_prefix_or_mention(raw_text)  # type: ignore[attr-defined]
+                else:
+                    stripped = None
+                if stripped:
+                    tokens = stripped.split()
+                    if tokens:
+                        name_token = tokens[0].lower()
+                        command_name = self.command_parser.alias_index.get(name_token, name_token)  # type: ignore[attr-defined]
+                        spec = self.command_parser.specs.get(command_name)  # type: ignore[attr-defined]
+                    else:
+                        spec = None
+                else:
+                    spec = None
+            except Exception:
+                spec = None
+
+            if spec is not None and getattr(spec, "min_level", None) is not None:
+                try:
+                    user_level = await self._compute_user_level(event.message.sender_id)
+                except Exception as exc:
+                    logger.warning(f"Permission pre-check failed: {exc}")
+                    user_level = 0
+                if user_level < spec.min_level:  # type: ignore[attr-defined]
+                    await self.send_reply(event.message, "❌ Permission denied.")
+                    return
             try:
                 command_invocation = self.parse_command(event.message)
             except Exception as exc:  # CommandError and others

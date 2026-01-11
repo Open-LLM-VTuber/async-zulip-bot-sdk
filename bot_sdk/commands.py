@@ -274,11 +274,14 @@ class CommandParser:
             return False
         raise ValueError(value)
 
-    def generate_help(self) -> str:
-        prefix = self.prefixes[0] if self.prefixes else ""
+    def generate_help(self, *, user_level: Optional[int] = None) -> str:
         lines: List[str] = []
         for spec in self.specs.values():
             if not spec.show_in_help:
+                continue
+            # If a user level is provided and the command requires a higher
+            # level, hide it from the help output to keep things simple.
+            if user_level is not None and spec.min_level is not None and spec.min_level > user_level:
                 continue
             summary = self._format_usage(spec)
             if spec.description:
@@ -288,9 +291,24 @@ class CommandParser:
 
     async def _handle_help(self, invocation: CommandInvocation, message: Any, bot: SupportsSendReply) -> None:
         # Default help handler: reply with generated help text.
+        # Try to obtain the caller's permission level if the bot exposes it.
+        user_level: Optional[int] = None
+        sender_id = getattr(message, "sender_id", None)
+        if sender_id is not None:
+            level_getter = getattr(bot, "get_user_level", None)
+            if callable(level_getter):
+                try:
+                    maybe_result = level_getter(sender_id)
+                    if hasattr(maybe_result, "__await__"):
+                        user_level = await maybe_result  # type: ignore[assignment]
+                    else:
+                        user_level = int(maybe_result)  # type: ignore[arg-type]
+                except Exception:  # pragma: no cover - help should degrade gracefully
+                    user_level = None
+
         target = invocation.args.get("command")
         if not target:
-            await bot.send_reply(message, self.generate_help())
+            await bot.send_reply(message, self.generate_help(user_level=user_level))
             return
 
         target_name = str(target).lower()
@@ -298,6 +316,12 @@ class CommandParser:
         spec = self.specs.get(spec_name)
         if not spec:
             await bot.send_reply(message, f"Unknown command: {target}")
+            return
+
+        # If we know the user's level and the command requires a higher level,
+        # do not reveal full details.
+        if user_level is not None and spec.min_level is not None and user_level < spec.min_level:
+            await bot.send_reply(message, f"You do not have permission to use command: {spec.name}")
             return
 
         detail = self._format_spec_detail(spec)
