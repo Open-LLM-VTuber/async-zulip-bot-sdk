@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from loguru import logger
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Dict, Iterable, List, Optional, Protocol, Sequence
 

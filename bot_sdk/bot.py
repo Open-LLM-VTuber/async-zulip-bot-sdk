@@ -56,7 +56,7 @@ class BaseBot(abc.ABC):
             prefixes=self.command_prefixes,
             enable_mentions=self.enable_mention_commands,
             auto_help=self.auto_help_command,
-            translator=lambda s: self.tr(s),
+            translator=self.tr,
         )
         self.storage: Optional[BotStorage] = None
         self.settings: Optional[BotLocalConfig] = None
@@ -425,6 +425,8 @@ class BaseBot(abc.ABC):
                     acl.append(uid)
                     await self.storage.put("acl.stop", acl)
                     await self.send_reply(message, ok(self.tr("User {user_id} allowed to stop bot", user_id=uid)))
+                else:
+                    await self.send_reply(message, ok(self.tr("User {user_id} is already allowed to stop bot", user_id=uid)))
             return
 
         if action == "deny_stop":
