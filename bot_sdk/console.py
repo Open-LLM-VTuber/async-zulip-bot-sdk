@@ -113,14 +113,11 @@ class BotManager:
 
 class LogBuffer:
     def __init__(self, max_lines: int = 400) -> None:
-        self._lines: list[str] = []
-        self._max_lines = max_lines
+        self._lines = deque(maxlen=max_lines)
 
     def append(self, message: str) -> None:
         # Sink for loguru: receives formatted string messages.
         self._lines.extend(message.rstrip("\n").splitlines())
-        if len(self._lines) > self._max_lines:
-            self._lines = self._lines[-self._max_lines :]
 
     @property
     def lines(self) -> list[str]:
@@ -429,8 +426,8 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
                                 char_str = ch.decode("utf-8", "ignore")
                                 if char_str and ord(char_str) >= 32:
                                     command_buffer += char_str
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                logger.debug("Failed to decode character: {}", e)
 
                     # Update UI
                     # We always refresh to animate the cursor blink or show new logs
