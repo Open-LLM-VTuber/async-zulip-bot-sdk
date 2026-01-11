@@ -210,6 +210,26 @@ class CommandParser:
         parsed_args = self._parse_args(tokens[1:], spec)
         return CommandInvocation(name=spec.name, args=parsed_args, tokens=tokens, spec=spec)
 
+    def find_command_spec(self, text: str) -> Optional[CommandSpec]:
+        """Return the CommandSpec for a raw message text, if any.
+
+        This is a lightweight helper for callers that only need to know
+        *which* command would be invoked (e.g., for permission checks)
+        without fully parsing arguments or raising errors for unknown
+        commands. It respects the same prefixes and @-mention rules as
+        :meth:`parse_message`.
+        """
+
+        stripped = self._strip_prefix_or_mention(text)
+        if stripped is None:
+            return None
+        tokens = stripped.split()
+        if not tokens:
+            return None
+        name_token = tokens[0].lower()
+        command_name = self.alias_index.get(name_token, name_token)
+        return self.specs.get(command_name)
+
     async def dispatch(self, invocation: CommandInvocation, *, message: Any, bot: SupportsSendReply) -> None:
         handler = invocation.spec.handler
         if handler is None:

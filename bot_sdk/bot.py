@@ -537,8 +537,8 @@ class BaseBot(abc.ABC):
         if self._orm_engine is not None:
             try:
                 await self._orm_engine.dispose()
-            except Exception:
-                logger.warning("Failed to dispose ORM engine cleanly")
+            except Exception as exc:
+                logger.warning(f"Failed to dispose ORM engine cleanly: {exc}")
 
     async def on_event(self, event: Event) -> None:
         """Main event handler. Default implementation dispatches commands and messages.
@@ -555,20 +555,7 @@ class BaseBot(abc.ABC):
             # their arguments are missing or malformed.
             try:
                 raw_text = (event.message.content or "").strip()
-                if raw_text:
-                    stripped = self.command_parser._strip_prefix_or_mention(raw_text)  # type: ignore[attr-defined]
-                else:
-                    stripped = None
-                if stripped:
-                    tokens = stripped.split()
-                    if tokens:
-                        name_token = tokens[0].lower()
-                        command_name = self.command_parser.alias_index.get(name_token, name_token)  # type: ignore[attr-defined]
-                        spec = self.command_parser.specs.get(command_name)  # type: ignore[attr-defined]
-                    else:
-                        spec = None
-                else:
-                    spec = None
+                spec = self.command_parser.find_command_spec(raw_text) if raw_text else None
             except Exception:
                 spec = None
 
