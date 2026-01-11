@@ -172,18 +172,21 @@ await cache.flush()  # 通常由上下文管理器自动调用
 
 ## 配置
 
-### 自定义存储路径
+> ⚠️ 自 v1.0.0 起，与存储相关的配置（如 `enable_storage`、`storage_path`）从每个 Bot 目录下的 `bot.yaml`（`BotLocalConfig`）读取，类属性不再生效。
 
-```python
-class MyBot(BaseBot):
-    storage_path = "data/my_bot.db"  # 自定义路径
+### 自定义存储路径（bot.yaml）
+
+```yaml
+# bots/my_bot/bot.yaml
+enable_storage: true
+storage_path: "data/my_bot.db"  # 自定义 KV 数据库存放路径
 ```
 
-### 禁用存储
+### 禁用存储（bot.yaml）
 
-```python
-class MyBot(BaseBot):
-    enable_storage = False  # 禁用存储功能
+```yaml
+# bots/my_bot/bot.yaml
+enable_storage: false  # 禁用存储功能
 ```
 
 ### 自定义序列化

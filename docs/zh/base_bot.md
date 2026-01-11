@@ -19,46 +19,23 @@ class MyBot(BaseBot):
         await self.send_reply(message, "收到消息！")
 ```
 
-## 类属性
+## 配置（重大变更）
 
-### command_prefixes
+- 配置现在来自每个 Bot 目录下的 `bot.yaml`（`BotLocalConfig` 字段）。
+- 旧的类属性（如 `command_prefixes`、`enable_mention_commands`、`auto_help_command`、`enable_storage`、`enable_orm` 等）**自 v1.0.0 起不再生效**，请改为在 YAML 中配置。
+- 详细字段说明和完整示例见 [配置文档](config.md)。
 
-```python
-command_prefixes = ("/", "!")
+**示例 `bots/my_bot/bot.yaml` 中与命令相关的配置：**
+
+```yaml
+command_prefixes:
+    - "/"
+    - "!"
+enable_mention_commands: true  # 允许 @Bot 触发命令
+auto_help_command: true        # 自动注册内置 help 命令
+enable_storage: true           # 启用 KV 存储
+enable_orm: false              # 如需 ORM 请改为 true
 ```
-
-命令前缀字符元组。默认为 `/` 和 `!`。
-
-**示例**：
-
-```python
-class MyBot(BaseBot):
-    command_prefixes = ("/", "!", "@")  # 支持三种前缀
-```
-
-### enable_mention_commands
-
-```python
-enable_mention_commands = True
-```
-
-是否将 @-提及视为命令触发器。默认为 `True`。
-
-**示例**：
-
-```python
-# 这些都会触发命令（如果 enable_mention_commands=True）：
-# "@Bot help"
-# "@**Bot Name** status"
-```
-
-### auto_help_command
-
-```python
-auto_help_command = True
-```
-
-是否自动注册内置的 help 命令。默认为 `True`。
 
 ### 内置命令
 

@@ -59,28 +59,8 @@ pip install -e .
 
 ### 🚀 Quick Start
 
-> ⚠️ Breaking change (next major): bot configuration now lives in each bot's `bot.yaml`. Class-level attributes (e.g., `command_prefixes`, `enable_storage`, `enable_orm`) are ignored.
+> ⚠️ Breaking change (since v1.0.0): bot configuration now lives in each bot's `bot.yaml`. Class-level attributes (e.g., `command_prefixes`, `enable_storage`, `enable_orm`) are ignored.
 > Set prefixes/mention/help/storage/ORM options in the bot's YAML instead of subclass attributes.
-
-#### Interactive Console (Recommended)
-
-The SDK comes with a built-in interactive console for managing bots, featuring a TUI (Text User Interface) powered by `rich`.
-
-1. **Run the console**:
-   ```bash
-   python main.py
-   ```
-
-   **Features:**
-   - **Rich TUI**: Beautiful, split-screen layout for logs, status, and input.
-   - **Command History**: Use `Up`/`Down` arrows to navigate previous commands.
-   - **Log Scrolling**: Use `PageUp`/`PageDown` to scroll through logs.
-   - **Bot Management**: Run, stop, and reload bots dynamically.
-   - **Tab Completion**: Press `Tab` to auto-complete commands and bot names.
-
-#### Creating a Single Bot Script
-
-If you prefer a simple script without the manager:
 
 #### 1. Configure Zulip Credentials
 
@@ -168,15 +148,34 @@ In this example, you would save it as `bots/echo_bot/__init__.py`.
 
 #### 5. Run Your Bots
 
+**Interactive Console**
+
+The SDK comes with a built-in interactive console for managing bots, featuring a TUI (Text User Interface) powered by `rich`.
+
+**Run the console**:
 ```bash
+# Never forget to activate your virtual environment
+# .venv\Scripts\activate  # Windows
+# source .venv/bin/activate  # macOS/Linux
+
 python main.py
 ```
+
+**Features:**
+- **Rich TUI**: Beautiful, split-screen layout for logs, status, and input.
+- **Command History**: Use `Up`/`Down` arrows to navigate previous commands.
+- **Log Scrolling**: Use `PageUp`/`PageDown` to scroll through logs.
+- **Bot Management**: Run, stop, and reload bots dynamically.
+- **Tab Completion**: Press `Tab` to auto-complete commands and bot names.
+
 
 After entering the interactive console, use the `run` command to start your bot:
 
 ```
 bot-console> run echo_bot
 ```
+
+Remember to use tab completion for faster typing!
 
 For more commands, type `help` in the console.
 
@@ -257,10 +256,14 @@ class MyBot(BaseBot):
 
 #### Custom Command Prefixes and Mention Detection
 
-```python
-class MyBot(BaseBot):
-    command_prefixes = ("!", "/", ".")
-    enable_mention_commands = True  # Enable @bot to trigger commands
+Configuration for prefixes and mention commands is now read from `bot.yaml` (per-bot YAML config). Class-level attributes are ignored.
+
+```yaml
+command_prefixes:
+- "!"
+- "/" # Not recommended as '/' is zulip official command prefix
+enable_mention_commands: true  # Enable @bot to trigger commands
+auto_help_command: true        # Auto-register built-in help command
 ```
 
 #### Typed Message Models
