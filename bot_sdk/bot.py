@@ -5,7 +5,7 @@ import importlib
 import inspect
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, AsyncIterator, Optional
+from typing import TYPE_CHECKING, AsyncIterator, Optional, Any
 
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
@@ -23,6 +23,7 @@ from .models import (
 )
 from .permissions import PermissionPolicy
 from .storage import BotStorage
+from .i18n import I18n, build_i18n_for_bot
 
 if TYPE_CHECKING:  # pragma: no cover - type-only import to avoid cycles
     from .runner import BotRunner
@@ -55,11 +56,17 @@ class BaseBot(abc.ABC):
             prefixes=self.command_prefixes,
             enable_mentions=self.enable_mention_commands,
             auto_help=self.auto_help_command,
+            translator=lambda s: self.tr(s),
         )
         self.storage: Optional[BotStorage] = None
         self.settings: Optional[BotLocalConfig] = None
         self.perms: Optional[PermissionPolicy] = None
         self._runner: Optional["BotRunner"] = None
+        # i18n
+        self.language: str = "en"
+        # Ensure the attribute exists before any translation attempts,
+        # even if i18n is not fully initialized yet.
+        self.i18n: Optional[I18n] = None
         # ORM engine/session factory (initialized only when enable_orm is True)
         self._orm_engine: Optional[AsyncEngine] = None
         self._orm_session_factory: Optional[async_sessionmaker[AsyncSession]] = None
@@ -84,6 +91,7 @@ class BaseBot(abc.ABC):
         await self._init_storage()
         await self._init_orm()
         await self._load_settings()
+        await self._init_i18n()
         await self._load_identity()
         await self._set_presence()
         await self._register_commands()
@@ -142,6 +150,25 @@ class BaseBot(abc.ABC):
         logger.info(f"Initializing ORM database for {self.__class__.__name__} at {db_url}")
         self._orm_engine = create_engine(db_url)
         self._orm_session_factory = create_sessionmaker(self._orm_engine)
+
+    async def _init_i18n(self) -> None:
+        """Initialize i18n helper for this bot.
+
+        Uses the bot-local language from settings (``language``) and
+        searches for translation files under ``<bot_dir>/i18n`` and
+        ``bot_sdk/i18n``.
+        """
+
+        lang = "en"
+        if self.settings and getattr(self.settings, "language", None):
+            lang = self.settings.language
+        self.language = lang
+        try:
+            self.i18n = build_i18n_for_bot(lang, self.__class__.__module__)
+            logger.info(f"Initialized i18n for {self.__class__.__name__} with language '{lang}'")
+        except Exception as exc:  # pragma: no cover - i18n should not block bot startup
+            self.i18n = None
+            logger.warning(f"Failed to initialize i18n for {self.__class__.__name__}: {exc}")
 
     async def _load_settings(self) -> None:
         """Load per-bot settings YAML next to the bot module by default."""
@@ -205,7 +232,7 @@ class BaseBot(abc.ABC):
         self.command_parser.register_spec(
             CommandSpec(
                 name="whoami",
-                description="Show your permission info",
+                description=self.tr("Show your permission info"),
                 handler=self._handle_whoami,
             )
         )
@@ -214,7 +241,7 @@ class BaseBot(abc.ABC):
         self.command_parser.register_spec(
             CommandSpec(
                 name="perm",
-                description="Manage bot permissions",
+                description=self.tr("Manage bot permissions"),
                 args=[
                     CommandArgument("action", str, required=True, description="Action: set_owner | roles_show | roles_set | allow_stop | deny_stop"),
                     CommandArgument("arg1", str, required=False, description="First argument (user_id or role) depending on action"),
@@ -229,7 +256,7 @@ class BaseBot(abc.ABC):
         self.command_parser.register_spec(
             CommandSpec(
                 name="stop",
-                description="Stop the bot",
+                description=self.tr("Stop the bot"),
                 handler=self._handle_stop,
                 min_level=stop_min_level,
             )
@@ -249,6 +276,23 @@ class BaseBot(abc.ABC):
             save_bot_local_config(self._settings_path, self.settings)
         except Exception:
             logger.warning("Failed to save bot settings")
+
+    def tr(self, key: str, **kwargs: Any) -> str:
+        """Translate a user-facing string using the bot's i18n helper.
+
+        Falls back to the original key when no translation is available
+        or when i18n has not been initialized yet.
+        """
+
+        i18n = getattr(self, "i18n", None)
+        if i18n is None:
+            if kwargs:
+                try:
+                    return key.format(**kwargs)
+                except Exception:
+                    return key
+            return key
+        return i18n.translate(key, **kwargs)
 
     @property
     def orm_sessionmaker(self) -> async_sessionmaker[AsyncSession]:
@@ -297,10 +341,12 @@ class BaseBot(abc.ABC):
         except Exception:
             pass
         text = (
-            "👤 User info\n"
-            f"User: {message.sender_full_name} (id={user_id})\n"
-            f"Roles: {', '.join(sorted(set(roles)))}\n"
-            f"Level: {level}"
+            "👤 "
+            + self.tr("User Info")
+            + "\n"
+            + f"{self.tr('User')}: {message.sender_full_name} (id={user_id})\n"
+            + f"{self.tr('Roles')}: {', '.join(sorted(set(roles)))}\n"
+            + f"{self.tr('Level')}: {level}"
         )
         await self.send_reply(message, text)
 
@@ -322,19 +368,19 @@ class BaseBot(abc.ABC):
             try:
                 new_owner = int(arg1)
             except Exception:
-                await self.send_reply(message, err("Invalid user_id"))
+                await self.send_reply(message, err(self.tr("Invalid user_id")))
                 return
             if not self.settings:
                 self.settings = BotLocalConfig()
             self.settings.owner_user_id = new_owner
             await self.save_settings()
-            await self.send_reply(message, ok(f"Bot owner set to {new_owner}"))
+            await self.send_reply(message, ok(self.tr("Bot owner set to {user_id}", user_id=new_owner)))
             return
 
         if action == "roles_show":
             role_levels = (self.settings.role_levels if self.settings else {"user": 1, "admin": 50, "owner": 100, "bot_owner": 200})
             lines = [f"{k}: {v}" for k, v in sorted(role_levels.items(), key=lambda kv: kv[1])]
-            await self.send_reply(message, "Current role levels:\n" + "\n".join(lines))
+            await self.send_reply(message, self.tr("Current role levels:\n{lines}", lines="\n".join(lines)))
             return
 
         if action == "roles_set":
@@ -351,7 +397,7 @@ class BaseBot(abc.ABC):
                 self.settings = BotLocalConfig()
             self.settings.role_levels[role] = level
             await self.save_settings()
-            await self.send_reply(message, ok(f"Role '{role}' level set to {level}"))
+            await self.send_reply(message, ok(self.tr("Role '{role}' level set to {level}", role=role, level=level)))
             return
 
         if action == "allow_stop":
@@ -361,7 +407,7 @@ class BaseBot(abc.ABC):
             try:
                 uid = int(arg1)
             except Exception:
-                await self.send_reply(message, err("Invalid user_id"))
+                await self.send_reply(message, err(self.tr("Invalid user_id")))
                 return
             acl = []
             if self.storage:
@@ -369,7 +415,7 @@ class BaseBot(abc.ABC):
                 if uid not in acl:
                     acl.append(uid)
                     await self.storage.put("acl.stop", acl)
-            await self.send_reply(message, ok(f"User {uid} allowed to stop bot"))
+                    await self.send_reply(message, ok(self.tr("User {user_id} allowed to stop bot", user_id=uid)))
             return
 
         if action == "deny_stop":
@@ -379,17 +425,17 @@ class BaseBot(abc.ABC):
             try:
                 uid = int(arg1)
             except Exception:
-                await self.send_reply(message, err("Invalid user_id"))
+                await self.send_reply(message, err(self.tr("Invalid user_id")))
                 return
             acl = []
             if self.storage:
                 acl = await self.storage.get("acl.stop", [])
                 acl = [x for x in acl if x != uid]
                 await self.storage.put("acl.stop", acl)
-            await self.send_reply(message, ok(f"User {uid} denied to stop bot"))
+            await self.send_reply(message, ok(self.tr("User {user_id} denied to stop bot", user_id=uid)))
             return
 
-        await self.send_reply(message, err("Unknown action. Use: set_owner | roles_show | roles_set | allow_stop | deny_stop"))
+        await self.send_reply(message, err(self.tr("Unknown action. Use: set_owner | roles_show | roles_set | allow_stop | deny_stop")))
 
     async def _handle_stop(self, invocation: CommandInvocation, message: Message, bot: BaseBot) -> None:
         """Stop the bot if the caller is authorized."""
@@ -412,7 +458,7 @@ class BaseBot(abc.ABC):
                 acl_allowed = False
 
         if user_level < stop_min and not acl_allowed:
-            await self.send_reply(message, "❌ Permission denied: you cannot stop this bot.")
+            await self.send_reply(message, self.tr("Permission denied: you cannot stop this bot."))
             return
 
         await self.send_reply(message, "🛑 Stopping the bot...")
@@ -498,13 +544,13 @@ class BaseBot(abc.ABC):
                     logger.warning(f"Permission pre-check failed: {exc}")
                     user_level = 0
                 if user_level < spec.min_level:  # type: ignore[attr-defined]
-                    await self.send_reply(event.message, "❌ Permission denied.")
+                    await self.send_reply(event.message, self.tr("Permission denied."))
                     return
             try:
                 command_invocation = self.parse_command(event.message)
             except Exception as exc:  # CommandError and others
                 logger.warning(f"Command parsing failed: {exc}")
-                await self.send_reply(event.message, f"Command error: {exc}")
+                await self.send_reply(event.message, self.tr("Command error: {error}", error=str(exc)))
                 return
 
             if command_invocation is not None:
@@ -514,12 +560,12 @@ class BaseBot(abc.ABC):
                     if spec and getattr(spec, "min_level", None) is not None:
                         user_level = await self._compute_user_level(event.message.sender_id)
                         if user_level < spec.min_level:  # type: ignore[attr-defined]
-                            await self.send_reply(event.message, "❌ Permission denied.")
+                            await self.send_reply(event.message, self.tr("Permission denied."))
                             return
                     await self.command_parser.dispatch(command_invocation, message=event.message, bot=self)
                 except Exception as exc:
                     logger.warning(f"Command dispatch failed: {exc}")
-                    await self.send_reply(event.message, f"Command error: {exc}")
+                    await self.send_reply(event.message, self.tr("Command error: {error}", error=str(exc)))
             else:
                 logger.debug(f"Received message: {event.message}")
                 await self.on_message(event.message)
