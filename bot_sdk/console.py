@@ -65,10 +65,10 @@ class BotManager:
         self._specs[spec.name] = spec
 
     async def start_all(self) -> list[str]:
-        results: list[str] = []
-        for name in self.available_bots:
-            results.append(await self.start_bot(name))
+        tasks = [self.start_bot(name) for name in self.available_bots]
+        results = await asyncio.gather(*tasks)
         return results
+
 
     async def start_bot(self, name: str) -> str:
         async with self._lock:
