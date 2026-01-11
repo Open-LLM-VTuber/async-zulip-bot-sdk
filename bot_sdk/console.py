@@ -432,9 +432,14 @@ async def _handle_command(
             return False
         bot_name = args[0]
         if bot_name == "all":
-            await manager.stop_all()
-            output_func("Stopped all bots")
+            results = await manager.stop_all()
+            if results:
+                for line in results:
+                    output_func(line)
+            else:
+                output_func("No running bots to stop.")
             return False
+
         result = await manager.stop_bot(bot_name)
         output_func(result)
         return False
