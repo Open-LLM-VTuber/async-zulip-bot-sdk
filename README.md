@@ -49,6 +49,25 @@ pip install -e .
 
 ### 🚀 Quick Start
 
+#### Interactive Console (Recommended)
+
+The SDK comes with a built-in interactive console for managing bots, featuring a TUI (Text User Interface) powered by `rich`.
+
+1. **Run the console**:
+   ```bash
+   python main.py
+   ```
+
+   **Features:**
+   - **Rich TUI**: Beautiful, split-screen layout for logs, status, and input.
+   - **Command History**: Use `Up`/`Down` arrows to navigate previous commands.
+   - **Log Scrolling**: Use `PageUp`/`PageDown` to scroll through logs.
+   - **Bot Management**: Start, stop, and reload bots dynamically.
+
+#### Creating a Single Bot Script
+
+If you prefer a simple script without the manager:
+
 #### 1. Configure Zulip Credentials
 
 Download your `zuliprc` file:

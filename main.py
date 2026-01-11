@@ -4,85 +4,18 @@ import importlib
 import inspect
 import os
 from contextlib import AsyncExitStack
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Iterable, List, Optional
+from typing import Any, Iterable, List, Optional
 
 from alembic import command
 from alembic.config import Config
 from loguru import logger
 
 from bot_sdk import BaseBot, BotRunner, setup_logging
-from bot_sdk.config import AppConfig, StorageConfig, load_config
+from bot_sdk.config import AppConfig, load_config
 from bot_sdk.db.database import make_sqlite_url
-
-
-@dataclass
-class BotSpec:
-    factory: Callable[[Any], BaseBot]
-    zuliprc: str
-    event_types: List[str]
-    storage: Optional[StorageConfig]
-
-
-def discover_bot_factories(config: AppConfig, bots_dir: str = "bots") -> List[BotSpec]:
-    specs: List[BotSpec] = []
-    base_path = Path(bots_dir)
-    if not base_path.exists():
-        logger.warning(f"Bots directory not found: {bots_dir}")
-        return specs
-
-    for bot_cfg in config.bots:
-        if not bot_cfg.enabled:
-            continue
-        module_name = bot_cfg.module or f"{bots_dir.replace('/', '.').replace('\\', '.')}" + f".{bot_cfg.name}"
-        try:
-            module = importlib.import_module(module_name)
-        except ModuleNotFoundError as exc:
-            logger.error(f"Bot module not found for {bot_cfg.name}: {module_name}")
-            raise exc
-
-        factory = _extract_factory(module, bot_cfg.class_name)
-        if factory is None:
-            raise RuntimeError(f"No bot factory/class found in module {module_name}")
-        zuliprc_path = Path(bot_cfg.zuliprc or base_path / bot_cfg.name / "zuliprc")
-        if not zuliprc_path.exists():
-            raise FileNotFoundError(f"zuliprc not found for bot {bot_cfg.name}: {zuliprc_path}")
-        specs.append(
-            BotSpec(
-                factory=_bind_factory(factory, bot_cfg.config),
-                zuliprc=str(zuliprc_path),
-                event_types=bot_cfg.event_types,
-                storage=bot_cfg.storage,
-            )
-        )
-    return specs
-
-
-def _bind_factory(factory: Callable[..., BaseBot], bot_config: dict[str, Any]) -> Callable[[Any], BaseBot]:
-    def wrapper(client: Any) -> BaseBot:
-        try:
-            return factory(client, bot_config)
-        except TypeError:
-            return factory(client)
-
-    return wrapper
-
-
-def _extract_factory(module, class_name: Optional[str] = None) -> Optional[Callable[[Any], BaseBot]]:
-    if callable(getattr(module, "create_bot", None)):
-        return module.create_bot
-    if class_name:
-        candidate = getattr(module, class_name, None)
-        if inspect.isclass(candidate) and issubclass(candidate, BaseBot):
-            return candidate
-    candidate = getattr(module, "BOT_CLASS", None) or getattr(module, "Bot", None)
-    if inspect.isclass(candidate) and issubclass(candidate, BaseBot):
-        return candidate
-    for attr in module.__dict__.values():
-        if inspect.isclass(attr) and issubclass(attr, BaseBot) and attr is not BaseBot:
-            return attr
-    return None
+from bot_sdk.console import run_console
+from bot_sdk.loader import BotSpec, _extract_factory, discover_bot_factories
 
 
 async def run_all_bots(bot_specs: Iterable[BotSpec]) -> None:
@@ -200,6 +133,11 @@ def _run_bots() -> None:
     asyncio.run(run_all_bots(bot_specs))
 
 
+def _run_console_mode() -> None:
+    setup_logging("INFO")
+    asyncio.run(run_console())
+
+
 def _make_migrations(bot_name: str, message: Optional[str] = None) -> None:
     """Create or update Alembic migrations for a specific bot.
 
@@ -312,9 +250,9 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "command",
         nargs="?",
-        choices=["run", "makemigrations", "migrate"],
-        default="run",
-        help="Command to execute: run bots (default), generate migrations, or apply migrations for a bot",
+        choices=["console", "run", "makemigrations", "migrate"],
+        default="console",
+        help="Command to execute: interactive console (default), run all bots, generate migrations, or apply migrations",
     )
     parser.add_argument("--bot", help="Bot name (for makemigrations)")
     parser.add_argument("-m", "--message", help="Migration message (for makemigrations)")
@@ -324,6 +262,10 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
 
 def main(argv: Optional[list[str]] = None) -> None:
     args = _parse_args(argv)
+
+    if args.command == "console":
+        _run_console_mode()
+        return
 
     if args.command == "run":
         _run_bots()

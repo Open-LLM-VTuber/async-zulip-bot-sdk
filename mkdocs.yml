@@ -1,6 +1,5 @@
 site_name: async-zulip-bot-sdk
 site_description: "Async Zulip Bot SDK documentation"
-site_url: https://docs.llmvtuber.com/async-zulip-bot-sdk/
 repo_url: https://github.com/Open-LLM-VTuber/async-zulip-bot-sdk/
 
 docs_dir: docs
@@ -19,6 +18,7 @@ nav:
       - Logging: logging.md
       - Models: models.md
       - Storage: storage.md
+  - Internationalization: i18n.md
 
 theme:
   name: material
@@ -51,6 +51,7 @@ plugins:
             Bot runner: Bot 运行器
             Commands: 命令系统
             Config: 配置
+            Internationalization: 国际化
             Logging: 日志
             Models: 数据模型
             Storage: 存储

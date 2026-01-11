@@ -26,7 +26,22 @@ site=https://your-zulip-server.com
 
 ## Create Your First Bot
 
-### 1. Basic Echo Bot
+### Option 1: Using the Interactive Console (Manages Multiple Bots)
+
+The SDK includes a `main.py` entry point that launches a rich interactive console. This is the recommended way to develop and run bots, as it supports hot reloads and managing multiple bots.
+
+1. **Run the Manager**:
+   ```bash
+   python main.py
+   ```
+   
+   The console supports:
+   
+   - **Command History**: `Up`/`Down` arrows.
+   - **Log Scrolling**: `PageUp`/`PageDown`.
+   - **Hot Reloading**: `reload <bot_name>` command.
+
+### Option 2: Basic Echo Bot Script
 
 Create `my_bot.py`:
 
