@@ -148,18 +148,32 @@ In this example, you would save it as `bots/echo_bot/__init__.py`.
 
 #### 5. Run Your Bots
 
+You can use this SDK in **your own project directory** (not necessarily this repo). A typical layout looks like:
+
+```text
+my-zulip-bots/
+    bots.yaml
+    bots/
+        echo_bot/
+            __init__.py
+            bot.yaml
+            zuliprc
+```
+
 **Interactive Console**
 
 The SDK comes with a built-in interactive console for managing bots, featuring a TUI (Text User Interface) powered by `rich`.
 
-**Run the console**:
+**Run the console (recommended)**:
 ```bash
-# Never forget to activate your virtual environment
+# Activate your virtual environment first
 # .venv\Scripts\activate  # Windows
 # source .venv/bin/activate  # macOS/Linux
 
-python main.py
+async-zulip-bot               # runs in the current project directory
 ```
+
+This command looks for `bots.yaml` and the `bots/` package in the **current working directory**, so run it from your own project root.
 
 **Features:**
 - **Rich TUI**: Beautiful, split-screen layout for logs, status, and input.

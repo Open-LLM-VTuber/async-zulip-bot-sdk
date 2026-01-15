@@ -35,4 +35,9 @@ setup(
         "ruamel-yaml>=0.19.1",
         "sqlalchemy>=2.0.0",
     ],
+    entry_points={
+        "console_scripts": [
+            "async-zulip-bot=bot_sdk.cli:main",
+        ],
+    },
 )
