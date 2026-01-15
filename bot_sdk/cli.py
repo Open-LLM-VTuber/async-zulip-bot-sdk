@@ -95,14 +95,14 @@ def main(argv: Optional[list[str]] = None) -> None:
         return
 
     if args.command == "makemigrations":
-        setup_logging("INFO")
+        setup_logging("DEBUG" if args.verbose else "INFO")
         if not args.bot:
             raise SystemExit("makemigrations requires --bot BOT_NAME")
         make_bot_migrations(args.bot, args.message)
         return
 
     if args.command == "migrate":
-        setup_logging("INFO")
+        setup_logging("DEBUG" if args.verbose else "INFO")
         if not args.bot:
             raise SystemExit("migrate requires --bot BOT_NAME")
         run_bot_migrations(args.bot, args.revision)
