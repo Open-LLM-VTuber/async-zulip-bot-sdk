@@ -43,6 +43,12 @@ def load_config(path: str | Path, model: type[BaseModel]) -> BaseModel:
         data = yaml.load(f) or {}
     return model.model_validate(data)
 
+def save_config(path: str | Path, config: BaseModel) -> None:
+    yaml = YAML()
+    yaml.default_flow_style = False
+    with open(path, "w", encoding="utf-8") as f:
+        yaml.dump(config.model_dump(exclude_none=True), f)
+
 
 # Per-bot local configuration (stored next to the bot code by default)
 class BotLocalConfig(BaseModel):
@@ -83,17 +89,11 @@ class BotLocalConfig(BaseModel):
 
 
 def load_bot_local_config(path: str | Path) -> BotLocalConfig:
-    yaml = YAML(typ="safe")
-    with open(path, "r", encoding="utf-8") as f:
-        data = yaml.load(f) or {}
-    return BotLocalConfig.model_validate(data)
+    return load_config(path, BotLocalConfig)
 
 
 def save_bot_local_config(path: str | Path, config: BotLocalConfig) -> None:
-    yaml = YAML()
-    yaml.default_flow_style = False
-    with open(path, "w", encoding="utf-8") as f:
-        yaml.dump(config.model_dump(exclude_none=True), f)
+    save_config(path, config)
 
 
 __all__ = [
