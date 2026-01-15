@@ -15,7 +15,11 @@ from .runner import BotRunner
 from .logging import setup_logging
 from .i18n import I18n, build_i18n_for_bot
 from .storage import BotStorage, CachedStorage
-from .config import StorageConfig
+from .config import (
+    StorageConfig,
+    load_config,
+    save_config,
+)
 from .models import (
 	Event,
 	EventsResponse,
@@ -88,4 +92,6 @@ __all__ = [
 	"AsyncRepository",
 	"I18n",
 	"build_i18n_for_bot",
+	"load_config",
+	"save_config",
 ]
