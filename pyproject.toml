@@ -16,3 +16,6 @@ dependencies = [
     "rich>=14.2.0",
     "prompt-toolkit>=3.0.52",
 ]
+
+[project.scripts]
+async-zulip-bot = "bot_sdk.cli:main"

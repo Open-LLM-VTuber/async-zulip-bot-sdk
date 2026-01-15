@@ -34,6 +34,15 @@ def discover_bot_factories(
         logger.warning(f"Bots directory not found: {bots_dir}")
         return specs
 
+    # Ensure the project root containing the bots directory is importable.
+    # When running via an installed console_script, sys.path[0] points to the
+    # environment's Scripts/ directory, not the user's project. Adding the
+    # parent of `bots_dir` makes modules like "bots.my_bot" importable when
+    # the user runs `async-zulip-bot` from their project root.
+    project_root = str(base_path.resolve().parent)
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+
     for bot_cfg in config.bots:
         if not bot_cfg.enabled:
             continue

@@ -145,18 +145,32 @@ BOT_CLASS = MyBot
 
 #### 5. 运行机器人
 
+你可以在**你自己的项目目录**中使用本 SDK（不需要把项目放进本仓库），一个典型结构如下：
+
+```text
+my-zulip-bots/
+    bots.yaml
+    bots/
+        echo_bot/
+            __init__.py
+            bot.yaml
+            zuliprc
+```
+
 **交互式控制台**
 
 本 SDK 内置了一个功能强大的交互式控制台，用于管理 Bot，基于 `rich` 提供了美观的 TUI（文本用户界面）。
 
-**运行控制台**：
+**运行控制台（推荐）**：
 ```bash
-# 永远不要忘记激活你的虚拟环境
-# .venv\Scripts\activate # Windows
-# source .venv/bin/activate # macOS/Linux
+# 先激活你的虚拟环境
+# .venv\Scripts\activate  # Windows
+# source .venv/bin/activate  # macOS/Linux
 
-python main.py
+async-zulip-bot              # 在当前项目根目录运行
 ```
+
+该命令会在**当前工作目录**中查找 `bots.yaml` 和 `bots/` 目录，所以请在你自己的项目根目录下执行。
 
 **主要功能：**
 - **Rich TUI**：美观的分屏布局，同时显示日志、状态和输入框。
