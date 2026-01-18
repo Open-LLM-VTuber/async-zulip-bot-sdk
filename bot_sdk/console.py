@@ -11,6 +11,7 @@ from loguru import logger
 
 from .config import AppConfig, load_config
 from .loader import BotSpec, discover_bot_factories
+from .log import DEFAULT_EXTRA, FILE_FORMAT, LOG_FOLDER, _coerce_compression
 from .runner import BotRunner
 from .db.cli import make_bot_migrations, run_bot_migrations
 
@@ -71,10 +72,11 @@ class ManagedBot:
 
 
 class BotManager:
-    def __init__(self, specs: Iterable[BotSpec]) -> None:
+    def __init__(self, specs: Iterable[BotSpec], log_level: str = "INFO") -> None:
         self._specs = {spec.name: spec for spec in specs}
         self._running: dict[str, ManagedBot] = {}
         self._lock = asyncio.Lock()
+        self._log_level = log_level
 
     @property
     def available_bots(self) -> list[str]:
@@ -105,6 +107,8 @@ class BotManager:
             spec.factory,
             client_kwargs={"config_file": spec.zuliprc},
             event_types=spec.event_types,
+            bot_name=spec.name,
+            log_level=self._log_level,
         )
         managed = ManagedBot(spec=spec, runner=runner)
         task = asyncio.create_task(self._run_runner(name, managed))
@@ -533,7 +537,7 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
 
     app_config = load_config(str(cfg_path), AppConfig)
     specs = discover_bot_factories(app_config, bots_dir)
-    manager: BotManager = BotManager(specs)
+    manager: BotManager = BotManager(specs, log_level=log_level)
 
     # Windows: keep Rich-based full-screen console with msvcrt key handling.
     use_rich_windows = _RICH_AVAILABLE and sys.platform.startswith("win")
@@ -551,11 +555,35 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
             def log_sink(message: str) -> None:
                 log_buffer.append(message)
 
+            # 在 Rich 控制台模式下，移除 stdout sink，保留文件 sink，并改为把日志写入 Rich 日志面板
             logger.remove()
-            # Restore styling and ensure ANSI codes are preserved for Text.from_ansi
+            logger.configure(extra=DEFAULT_EXTRA)
+
+            # 重新添加 system.log 文件 sink（与 setup_logging 一致，但不再写 stdout）
+            system_logger = logger.bind(bot_name="SYSTEM")
+            system_filter = lambda record: record.get("extra", {}).get("bot_name") == "SYSTEM"
+            system_logger.add(
+                LOG_FOLDER / "system.log",
+                level=log_level,
+                format=FILE_FORMAT,
+                enqueue=True,
+                rotation="12:00",
+                retention="1 week",
+                compression=_coerce_compression(True),
+                colorize=False,
+                filter=system_filter,
+            )
+
+            # 额外添加一个 Rich UI sink：所有级别的日志都会进 Logs 面板
             timefmt = "%Y-%m-%d %H:%M:%S"
-            fmt = "<green>{time:"+ timefmt +"}</green> |[<level>{level}</level>]| <cyan>{name} | line: {line}</cyan> | <level>{message}</level>"
-            logger.add(log_sink, format=fmt, level=log_level, enqueue=False, colorize=True)
+            fmt = (
+                "<magenta>{extra[bot_name]}</magenta> | "
+                "<green>{time:" + timefmt + "}</green> | "
+                "[<level>{level}</level>] | "
+                "<cyan>{name}:{line}</cyan> | "
+                "<level>{message}</level>"
+            )
+            logger.add(log_sink, format=fmt, level=log_level, enqueue=True, colorize=True)
 
             def output_to_logs(msg: str) -> None:
                 logger.info(msg)
@@ -610,22 +638,30 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
                         elif ch in {b"\xe0", b"\x00"}:  # Arrow keys prefix
                             sc = msvcrt.getch()
                             if sc == b"H":  # Up
-                                if history_idx < len(command_history):
-                                    if history_idx == 0:
-                                        # (Optional) could save current draft
-                                        pass
-                                    command_buffer = command_history[history_idx]
-                                    history_idx += 1
-                            elif sc == b"P":  # Down
-                                if history_idx > 0:
-                                    history_idx -= 1
-                                    if history_idx == 0:
-                                        command_buffer = ""
-                                    else:
-                                        command_buffer = command_history[history_idx - 1]
+                                # 没有正在编辑的命令时，用于滚动日志（包括鼠标滚轮映射的 Up）
+                                if not command_buffer and history_idx == 0:
+                                    ui.scroll_offset += 5
                                 else:
-                                    command_buffer = ""
-                                    history_idx = 0
+                                    if history_idx < len(command_history):
+                                        if history_idx == 0:
+                                            # (Optional) could save current draft
+                                            pass
+                                        command_buffer = command_history[history_idx]
+                                        history_idx += 1
+                            elif sc == b"P":  # Down
+                                # 同理，如果没有命令历史在浏览，就用来向下滚动日志
+                                if not command_buffer and history_idx == 0:
+                                    ui.scroll_offset = max(0, ui.scroll_offset - 5)
+                                else:
+                                    if history_idx > 0:
+                                        history_idx -= 1
+                                        if history_idx == 0:
+                                            command_buffer = ""
+                                        else:
+                                            command_buffer = command_history[history_idx - 1]
+                                    else:
+                                        command_buffer = ""
+                                        history_idx = 0
                             elif sc == b"I":  # Page Up
                                 ui.scroll_offset += 5
                             elif sc == b"Q":  # Page Down

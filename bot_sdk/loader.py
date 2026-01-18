@@ -16,7 +16,7 @@ from .config import AppConfig, StorageConfig
 @dataclass
 class BotSpec:
     name: str
-    factory: Callable[[Any], BaseBot]
+    factory: Callable[[Any, Any], BaseBot]
     zuliprc: str
     event_types: List[str]
     storage: Optional[StorageConfig]
@@ -74,12 +74,27 @@ def discover_bot_factories(
     return specs
 
 
-def _bind_factory(factory: Callable[..., BaseBot], bot_config: dict[str, Any]) -> Callable[[Any], BaseBot]:
-    def wrapper(client: Any) -> BaseBot:
-        try:
-            return factory(client, bot_config)
-        except TypeError:
-            return factory(client)
+def _bind_factory(factory: Callable[..., BaseBot], bot_config: dict[str, Any]) -> Callable[[Any, Any], BaseBot]:
+    def wrapper(client: Any, logger: Any) -> BaseBot:
+        # Try common signatures in order while avoiding swallowing unrelated TypeErrors.
+        attempts = [
+            lambda: factory(client, bot_config, logger),
+            lambda: factory(client, logger),
+            lambda: factory(client, bot_config),
+            lambda: factory(client),
+        ]
+
+        last_exc: Optional[TypeError] = None
+        for attempt in attempts:
+            try:
+                return attempt()
+            except TypeError as exc:
+                # Swallow signature mismatches and try the next shape.
+                last_exc = exc
+                continue
+        # If all attempts failed, surface the last TypeError for debugging.
+        assert last_exc is not None
+        raise last_exc
 
     return wrapper
 

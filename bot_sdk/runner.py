@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, Type
 
 from .async_zulip import AsyncClient
 from .bot import BaseBot
-from .logging import logger
+from .log import Logger, get_bot_logger, logger
 
 
 class BotRunner:
@@ -13,17 +13,21 @@ class BotRunner:
 
     def __init__(
         self,
-        bot_factory: Callable[[AsyncClient], BaseBot],
+        bot_factory: Callable[[AsyncClient, Logger], BaseBot],
         *,
         event_types: Optional[List[str]] = None,
         narrow: Optional[List[List[str]]] = None,
         client_kwargs: Optional[Dict[str, Any]] = None,
         max_concurrency: int = 8,
+        bot_name: Optional[str] = None,
+        log_level: str = "INFO",
     ) -> None:
         self.bot_factory = bot_factory
         self.event_types = event_types or ["message"]
         self.narrow = narrow or []
         self.client_kwargs = client_kwargs or {}
+        self.bot_name = bot_name or "UNKNOWN_BOT"
+        self._log_level = log_level
         self.client: Optional[AsyncClient] = None
         self.bot: Optional[BaseBot] = None
         self._semaphore = asyncio.Semaphore(max_concurrency)
@@ -31,6 +35,7 @@ class BotRunner:
         self._max_concurrency = max_concurrency
         self._stop_event = asyncio.Event()
         self._longpoll_task: Optional[asyncio.Task[None]] = None
+        self._bot_logger: Logger = logger.bind(bot_name=self.bot_name)
 
     async def __aenter__(self) -> "BotRunner":
         await self.start()
@@ -40,13 +45,15 @@ class BotRunner:
         await self.stop()
 
     async def start(self) -> None:
+        self._bot_logger = get_bot_logger(self.bot_name, level=self._log_level)
+
         self.client = AsyncClient(**self.client_kwargs)
-        self.bot = self.bot_factory(self.client)
+        self.bot = self.bot_factory(self.client, self._bot_logger)
         # Give the bot a back-reference so commands can trigger runner-level actions (e.g., stop).
         if hasattr(self.bot, "set_runner"):
             self.bot.set_runner(self)
         await self.bot.post_init()
-        logger.info("Bot started with event types {}", self.event_types)
+        self._bot_logger.info("Bot '{}' started with event types {}", self.bot_name, self.event_types)
         await self.client.ensure_session()
         await self.bot.on_start()
 
@@ -67,7 +74,7 @@ class BotRunner:
             await self.bot.on_stop()
         if self.client:
             await self.client.aclose()
-            logger.info("Bot stopped")
+            self._bot_logger.info("Bot '{}' stopped", self.bot_name)
 
     async def run_forever(self) -> None:
         if not self.client or not self.bot:
@@ -94,11 +101,11 @@ class BotRunner:
                     return
                 exc = t.exception()
                 if exc:
-                    logger.exception("Unhandled error in bot event task: {}", exc)
+                    self._bot_logger.exception("Unhandled error in bot event task: {}", exc)
 
             task.add_done_callback(_cleanup)
 
-        logger.info(
+        self._bot_logger.info(
             "Starting event loop with max_concurrency={} and event_types={}",
             self._max_concurrency,
             self.event_types,
@@ -111,7 +118,7 @@ class BotRunner:
         try:
             done, pending = await asyncio.wait({self._longpoll_task, stop_waiter}, return_when=asyncio.FIRST_COMPLETED)
             if stop_waiter in done:
-                logger.info("Stop requested; cancelling event stream")
+                self._bot_logger.info("Stop requested; cancelling event stream")
                 if self._longpoll_task:
                     self._longpoll_task.cancel()
             elif self._longpoll_task in done:
@@ -119,7 +126,7 @@ class BotRunner:
                 exc = self._longpoll_task.exception() if self._longpoll_task else None
                 if exc:
                     raise exc
-                logger.warning("Event stream completed unexpectedly; shutting down")
+                self._bot_logger.warning("Event stream completed unexpectedly; shutting down")
                 self._stop_event.set()
         finally:
             if self._longpoll_task:
@@ -133,7 +140,7 @@ class BotRunner:
         if self._stop_event.is_set():
             return
         if reason:
-            logger.info("Stop requested: {}", reason)
+            self._bot_logger.info("Stop requested: {}", reason)
         self._stop_event.set()
         if self._longpoll_task:
             self._longpoll_task.cancel()
@@ -148,7 +155,13 @@ def run_bot(
 ) -> None:
     """Convenience entrypoint."""
 
-    runner = BotRunner(lambda c: bot_cls(c), event_types=event_types, narrow=narrow, client_kwargs=client_kwargs)
+    runner = BotRunner(
+        lambda c, log: bot_cls(c, log),
+        event_types=event_types,
+        narrow=narrow,
+        client_kwargs=client_kwargs,
+        bot_name=bot_cls.__name__,
+    )
 
     async def _run() -> None:
         async with runner:

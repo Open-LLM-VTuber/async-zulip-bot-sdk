@@ -27,7 +27,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import logging
 import optparse
 import os
 import platform
@@ -74,7 +73,7 @@ from .models import (
 
 __version__ = "0.9.1-async"
 
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 API_VERSTRING = "v1/"
 
@@ -214,7 +213,7 @@ def add_default_arguments(
 
 
 def generate_option_group(parser: optparse.OptionParser, prefix: str = "") -> optparse.OptionGroup:
-    logging.warning(
+    logger.warning(
         """zulip.generate_option_group is based on optparse, which
                     is now deprecated. We recommend migrating to argparse and
                     using zulip.add_default_arguments instead."""
@@ -540,10 +539,13 @@ class AsyncClient:
                 kwargs = {kwarg: query_state["request"]}
                 if files:
                     kwargs["files"] = req_files
+                    
+                full_url = urllib.parse.urljoin(self.base_url, url)
+                logger.debug(f"Making {method} request to {full_url} with {kwargs}")
 
                 res = await self.session.request(
                     method,
-                    urllib.parse.urljoin(self.base_url, url),
+                    full_url,
                     timeout=request_timeout,
                     **kwargs,
                 )
@@ -561,7 +563,9 @@ class AsyncClient:
                 raise e
             except httpx.ConnectError as e:
                 if not self.has_connected:
-                    raise UnrecoverableNetworkError("cannot connect to server " + self.base_url) from e
+                    raise UnrecoverableNetworkError(
+                        "cannot connect to server " + full_url
+                    ) from e
                 if error_retry(""):
                     await asyncio.sleep(1)
                     continue

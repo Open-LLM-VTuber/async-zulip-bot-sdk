@@ -8,19 +8,22 @@ from typing import Iterable, List, Optional
 
 from loguru import logger
 
-from . import BotRunner, setup_logging
+from .runner import BotRunner
+from .log import setup_logging, get_bot_logger
 from .config import AppConfig, load_config
 from .console import run_console
 from .db.cli import make_bot_migrations, run_bot_migrations
 from .loader import BotSpec, discover_bot_factories
 
 
-async def run_all_bots(bot_specs: Iterable[BotSpec]) -> None:
+async def run_all_bots(bot_specs: Iterable[BotSpec], log_level: str = "INFO") -> None:
     runners = [
         BotRunner(
             spec.factory,
             client_kwargs={"config_file": spec.zuliprc},
             event_types=spec.event_types,
+            bot_name=spec.name,
+            log_level=log_level,
         )
         for spec in bot_specs
     ]
@@ -47,13 +50,14 @@ async def run_all_bots(bot_specs: Iterable[BotSpec]) -> None:
 
 
 def _run_bots(config_path: str = "bots.yaml", verbose: bool = False) -> None:
-    setup_logging("DEBUG" if verbose else "INFO")
+    log_level = "DEBUG" if verbose else "INFO"
+    setup_logging(log_level)
     path_obj: Path = Path(config_path)
     if not path_obj.exists():
         raise FileNotFoundError(f"{path_obj} not found; please create it to list bots to launch")
     app_config = load_config(str(path_obj), AppConfig)
     bot_specs = discover_bot_factories(app_config)
-    asyncio.run(run_all_bots(bot_specs))
+    asyncio.run(run_all_bots(bot_specs, log_level=log_level))
 
 
 def _run_console_mode(config_path: str = "bots.yaml", verbose: bool = False) -> None:

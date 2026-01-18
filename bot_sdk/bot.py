@@ -7,9 +7,9 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, AsyncIterator, Optional, Any
 
-from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from .log import Logger
 from .async_zulip import AsyncClient
 from .commands import CommandArgument, CommandInvocation, CommandParser, CommandSpec
 from .config import BotLocalConfig, StorageConfig, load_bot_local_config, save_bot_local_config
@@ -38,7 +38,8 @@ class BaseBot(abc.ABC):
     `bot.yaml` instead of subclass attributes.
     """
 
-    def __init__(self, client: AsyncClient) -> None:
+    def __init__(self, client: AsyncClient, logger: Logger) -> None:
+        self.logger = logger
         self.client = client
         # These will be populated from bot.yaml in _load_settings
         self.command_prefixes: tuple[str, ...] = tuple()
@@ -63,7 +64,7 @@ class BaseBot(abc.ABC):
         # ORM engine/session factory (initialized only when enable_orm is True)
         self._orm_engine: Optional[AsyncEngine] = None
         self._orm_session_factory: Optional[async_sessionmaker[AsyncSession]] = None
-        logger.debug(f"Initialized bot {self.__class__.__name__}")
+        self.logger.debug(f"Initialized bot {self.__class__.__name__}")
 
     def set_runner(self, runner: "BotRunner") -> None:
         """Called by BotRunner to allow commands to signal runner actions."""
@@ -106,7 +107,7 @@ class BaseBot(abc.ABC):
             auto_flush_retry=auto_cfg.auto_flush_retry,
             auto_flush_max_retries=auto_cfg.auto_flush_max_retries,
         )
-        logger.info(f"Initialized storage at {self.storage_path}")
+        self.logger.info(f"Initialized storage at {self.storage_path}")
         # Initialize permissions helper
         self.perms = PermissionPolicy(self.client, self.storage)
 
@@ -141,7 +142,7 @@ class BaseBot(abc.ABC):
                 self.orm_db_path = f"bot_data/{db_name}.sqlite"
 
         db_url = make_sqlite_url(self.orm_db_path)
-        logger.info(f"Initializing ORM database for {self.__class__.__name__} at {db_url}")
+        self.logger.info(f"Initializing ORM database for {self.__class__.__name__} at {db_url}")
         self._orm_engine = create_engine(db_url)
         self._orm_session_factory = create_sessionmaker(self._orm_engine)
 
@@ -159,10 +160,10 @@ class BaseBot(abc.ABC):
         self.language = lang
         try:
             self.i18n = build_i18n_for_bot(lang, self.__class__.__module__)
-            logger.info(f"Initialized i18n for {self.__class__.__name__} with language '{lang}'")
+            self.logger.info(f"Initialized i18n for {self.__class__.__name__} with language '{lang}'")
         except Exception as exc:  # pragma: no cover - i18n should not block bot startup
             self.i18n = None
-            logger.warning(f"Failed to initialize i18n for {self.__class__.__name__}: {exc}")
+            self.logger.warning(f"Failed to initialize i18n for {self.__class__.__name__}: {exc}")
 
     async def _load_settings(self) -> None:
         """Load per-bot settings YAML next to the bot module by default."""
@@ -172,19 +173,19 @@ class BaseBot(abc.ABC):
             mod_file = inspect.getfile(mod)
             default_path = Path(mod_file).parent / "bot.yaml"
         except Exception:
-            logger.warning("Failed to determine bot module path, using ./bot.yaml for settings")
+            self.logger.warning("Failed to determine bot module path, using ./bot.yaml for settings")
             default_path = Path("bot.yaml")
         # Load settings
         if not default_path.exists():
-            logger.info(f"No bot settings file found at {default_path}, using defaults.")
+            self.logger.info(f"No bot settings file found at {default_path}, using defaults.")
             self.settings = BotLocalConfig()
             self._settings_path = default_path  # type: ignore[attr-defined]
             await self.save_settings()  # Save default config
-            logger.info(f"Created default bot settings at {default_path}")
+            self.logger.info(f"Created default bot settings at {default_path}")
         else:
             self.settings = load_bot_local_config(default_path)
             self._settings_path = default_path  # type: ignore[attr-defined]
-            logger.info(f"Loaded bot settings from {default_path}")
+            self.logger.info(f"Loaded bot settings from {default_path}")
 
         # Apply settings to runtime fields (YAML is the single source of truth now)
         overrides = self.settings
@@ -221,10 +222,10 @@ class BaseBot(abc.ABC):
         if self.storage:
             profile_data = await self.storage.get("__profile__")
         if profile_data:
-            logger.debug("Loaded bot profile from storage cache")
+            self.logger.debug("Loaded bot profile from storage cache")
             email = profile_data.get("email")
         else:
-            logger.debug("Fetching bot profile for command parser identity aliases")
+            self.logger.debug("Fetching bot profile for command parser identity aliases")
             profile = await self.client.get_profile()
             profile_data = {
                 "user_id": profile.user_id,
@@ -238,12 +239,12 @@ class BaseBot(abc.ABC):
         self._user_id = profile_data["user_id"]
         self._user_name = profile_data["full_name"]
         self.command_parser.add_identity_aliases(full_name=self._user_name, email=email)
-        logger.info(f"{self.__class__.__name__} started with user_id: {self._user_id}")
+        self.logger.info(f"{self.__class__.__name__} started with user_id: {self._user_id}")
 
     async def _set_presence(self) -> None:
         """Set active presence on startup."""
         await self.client.update_presence(UpdatePresenceRequest(status="active"))
-        logger.info("Set presence to active")
+        self.logger.info("Set presence to active")
 
     async def _register_commands(self) -> None:
         """Register built-in and bot-specific commands.
@@ -306,7 +307,7 @@ class BaseBot(abc.ABC):
         try:
             save_bot_local_config(self._settings_path, self.settings)
         except Exception:
-            logger.warning("Failed to save bot settings")
+            self.logger.warning("Failed to save bot settings")
 
     def tr(self, key: str, **kwargs: Any) -> str:
         """Translate a user-facing string using the bot's i18n helper.
@@ -481,15 +482,15 @@ class BaseBot(abc.ABC):
         try:
             if settings_path is not None and settings_path.exists():
                 self.settings = load_bot_local_config(settings_path)
-                logger.info(f"Reloaded bot settings from {settings_path}")
+                self.logger.info(f"Reloaded bot settings from {settings_path}")
             else:
-                logger.warning("No settings path available for reload; skipping settings reload")
+                self.logger.warning("No settings path available for reload; skipping settings reload")
 
             # Reinitialize i18n based on the possibly updated language.
             await self._init_i18n()
             await self.send_reply(message, f"✅ {self.tr('Configuration and translations reloaded.')}")
         except Exception as exc:
-            logger.warning(f"Reload failed: {exc}")
+            self.logger.warning(f"Reload failed: {exc}")
             await self.send_reply(
                 message,
                 f"❌ "
@@ -505,7 +506,7 @@ class BaseBot(abc.ABC):
         try:
             user_level = await self._compute_user_level(requester)
         except Exception as exc:
-            logger.warning(f"Stop permission level check failed: {exc}")
+            self.logger.warning(f"Stop permission level check failed: {exc}")
             user_level = 0
 
         acl_allowed = False
@@ -524,7 +525,7 @@ class BaseBot(abc.ABC):
         if self._runner:
             self._runner.request_stop(reason=f"requested by user {requester}")
         else:
-            logger.warning("Stop requested but runner reference is missing; bot may keep running")
+            self.logger.warning("Stop requested but runner reference is missing; bot may keep running")
 
     async def get_user_level(self, user_id: int) -> int:
         """Public helper for resolving a user's permission level.
@@ -555,14 +556,14 @@ class BaseBot(abc.ABC):
 
     async def on_stop(self) -> None:
         """Hook for cleanup logic. Override if needed."""
-        logger.info("Bot stopping, performing cleanup...")
+        self.logger.info("Bot stopping, performing cleanup...")
         await self.save_settings()
         # Dispose ORM engine if it was initialized
         if self._orm_engine is not None:
             try:
                 await self._orm_engine.dispose()
             except Exception as exc:
-                logger.warning(f"Failed to dispose ORM engine cleanly: {exc}")
+                self.logger.warning(f"Failed to dispose ORM engine cleanly: {exc}")
 
     async def on_event(self, event: Event) -> None:
         """Main event handler. Default implementation dispatches commands and messages.
@@ -572,7 +573,7 @@ class BaseBot(abc.ABC):
         """
         if event.type == "message" and event.message is not None:
             if event.message.sender_id == self._user_id:
-                logger.debug("Ignoring message from self")
+                self.logger.debug("Ignoring message from self")
                 return  # Ignore messages from ourselves
             # Early permission check based on command name only, so that
             # users without sufficient level get a clear denial even if
@@ -587,7 +588,7 @@ class BaseBot(abc.ABC):
                 try:
                     user_level = await self._compute_user_level(event.message.sender_id)
                 except Exception as exc:
-                    logger.warning(f"Permission pre-check failed: {exc}")
+                    self.logger.warning(f"Permission pre-check failed: {exc}")
                     user_level = 0
                 if user_level < spec.min_level:  # type: ignore[attr-defined]
                     await self.send_reply(event.message, self.tr("Permission denied."))
@@ -595,13 +596,13 @@ class BaseBot(abc.ABC):
             try:
                 command_invocation = self.parse_command(event.message)
             except Exception as exc:  # CommandError and others
-                logger.warning(f"Command parsing failed: {exc}")
+                self.logger.warning(f"Command parsing failed: {exc}")
                 await self.send_reply(event.message, self.tr("Command error: {error}", error=str(exc)))
                 return
 
             if command_invocation is not None:
                 try:
-                    logger.debug(f"Dispatching command: {command_invocation.name} with args {command_invocation.args}")
+                    self.logger.debug(f"Dispatching command: {command_invocation.name} with args {command_invocation.args}")
                     spec = command_invocation.spec
                     if spec and getattr(spec, "min_level", None) is not None:
                         user_level = await self._compute_user_level(event.message.sender_id)
@@ -610,10 +611,10 @@ class BaseBot(abc.ABC):
                             return
                     await self.command_parser.dispatch(command_invocation, message=event.message, bot=self)
                 except Exception as exc:
-                    logger.warning(f"Command dispatch failed: {exc}")
+                    self.logger.warning(f"Command dispatch failed: {exc}")
                     await self.send_reply(event.message, self.tr("Command error: {error}", error=str(exc)))
             else:
-                logger.debug(f"Received message: {event.message}")
+                self.logger.debug(f"Received message: {event.message}")
                 await self.on_message(event.message)
 
     @abc.abstractmethod

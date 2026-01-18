@@ -12,7 +12,7 @@ from .commands import (
     Validator,
 )
 from .runner import BotRunner
-from .logging import setup_logging
+from .log import setup_logging, get_bot_logger
 from .i18n import I18n, build_i18n_for_bot
 from .storage import BotStorage, CachedStorage
 from .config import (
@@ -94,4 +94,5 @@ __all__ = [
 	"build_i18n_for_bot",
 	"load_config",
 	"save_config",
+	"get_bot_logger"
 ]

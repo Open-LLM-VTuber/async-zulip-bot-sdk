@@ -224,3 +224,5 @@ bots.yaml
 bot_data/
 
 bot.yaml
+
+logs/
