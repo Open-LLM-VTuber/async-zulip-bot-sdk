@@ -21,16 +21,24 @@ def _ensure_migration_templates(migrations_dir: Path) -> None:
     target_env = migrations_dir / "env.py"
     if not target_env.exists():
         if not template_env.exists():
-            raise FileNotFoundError(f"Alembic template env.py not found at {template_env}")
-        target_env.write_text(template_env.read_text(encoding="utf-8"), encoding="utf-8")
+            raise FileNotFoundError(
+                f"Alembic template env.py not found at {template_env}"
+            )
+        target_env.write_text(
+            template_env.read_text(encoding="utf-8"), encoding="utf-8"
+        )
 
     template_script = Path("bot_sdk") / "db" / "migrations" / "script.py.mako"
     target_script = migrations_dir / "script.py.mako"
     if not target_script.exists() and template_script.exists():
-        target_script.write_text(template_script.read_text(encoding="utf-8"), encoding="utf-8")
+        target_script.write_text(
+            template_script.read_text(encoding="utf-8"), encoding="utf-8"
+        )
 
 
-def ensure_bot_orm_enabled(bot_name: str, bots_dir: str = "bots") -> Optional[type[BaseBot]]:
+def ensure_bot_orm_enabled(
+    bot_name: str, bots_dir: str = "bots"
+) -> Optional[type[BaseBot]]:
     """Validate that the target bot exists and has ORM enabled.
 
     Returns the resolved BaseBot subclass when available so callers can
@@ -43,11 +51,16 @@ def ensure_bot_orm_enabled(bot_name: str, bots_dir: str = "bots") -> Optional[ty
         raise FileNotFoundError("bots.yaml not found; cannot resolve bot configuration")
 
     app_config = load_config(str(config_path), AppConfig)
-    bot_cfg = next((b for b in app_config.bots if b.name == bot_name and b.enabled), None)
+    bot_cfg = next(
+        (b for b in app_config.bots if b.name == bot_name and b.enabled), None
+    )
     if bot_cfg is None:
         raise SystemExit(f"Bot '{bot_name}' not found or disabled in bots.yaml")
 
-    module_name = bot_cfg.module or f"{bots_dir.replace('/', '.').replace('\\', '.')}" + f".{bot_cfg.name}"
+    module_name = (
+        bot_cfg.module
+        or f"{bots_dir.replace('/', '.').replace('\\', '.')}" + f".{bot_cfg.name}"
+    )
     module = importlib.import_module(module_name)
 
     bot_type: Optional[type[BaseBot]] = None
@@ -110,7 +123,7 @@ def make_bot_migrations(bot_name: str, message: Optional[str] = None) -> None:
     script_location to ``bots/<bot_name>/migrations`` so that each
     bot keeps its own migration history.
     """
-    
+
     # Ensure setup_logging logic is handled by caller (main or console) or defaults exist.
     # We won't call setup_logging here to avoid overriding caller's config.
 
@@ -168,7 +181,9 @@ def run_bot_migrations(bot_name: str, revision: str = "head") -> None:
 
     migrations_dir = bot_dir / "migrations"
     if not migrations_dir.exists():
-        raise FileNotFoundError(f"Migrations directory not found for bot {bot_name}: {migrations_dir}")
+        raise FileNotFoundError(
+            f"Migrations directory not found for bot {bot_name}: {migrations_dir}"
+        )
 
     # Ensure env.py and script.py.mako exist (required by Alembic script environment)
     _ensure_migration_templates(migrations_dir)
@@ -183,5 +198,7 @@ def run_bot_migrations(bot_name: str, revision: str = "head") -> None:
     cfg = Config("alembic.ini")
     cfg.set_main_option("script_location", migrations_dir.as_posix())
 
-    logger.info(f"Applying Alembic migrations for bot '{bot_name}' to revision '{revision}'")
+    logger.info(
+        f"Applying Alembic migrations for bot '{bot_name}' to revision '{revision}'"
+    )
     command.upgrade(cfg, revision)

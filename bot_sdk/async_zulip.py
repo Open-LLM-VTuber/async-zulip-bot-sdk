@@ -27,7 +27,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import logging
 import optparse
 import os
 import platform
@@ -74,7 +73,7 @@ from .models import (
 
 __version__ = "0.9.1-async"
 
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 API_VERSTRING = "v1/"
 
@@ -164,9 +163,13 @@ def add_default_arguments(
         )
 
     group = parser.add_argument_group("Zulip API configuration")
-    group.add_argument("--site", dest="zulip_site", help="Zulip server URI", default=None)
+    group.add_argument(
+        "--site", dest="zulip_site", help="Zulip server URI", default=None
+    )
     group.add_argument("--api-key", dest="zulip_api_key", action="store")
-    group.add_argument("--user", dest="zulip_email", help="Email address of the calling bot or user.")
+    group.add_argument(
+        "--user", dest="zulip_email", help="Email address of the calling bot or user."
+    )
     group.add_argument(
         "--config-file",
         action="store",
@@ -174,9 +177,15 @@ def add_default_arguments(
         help="""Location of an ini file containing the above
                             information. (default ~/.zuliprc)""",
     )
-    group.add_argument("-v", "--verbose", action="store_true", help="Provide detailed output.")
     group.add_argument(
-        "--client", action="store", default=None, dest="zulip_client", help=argparse.SUPPRESS
+        "-v", "--verbose", action="store_true", help="Provide detailed output."
+    )
+    group.add_argument(
+        "--client",
+        action="store",
+        default=None,
+        dest="zulip_client",
+        help=argparse.SUPPRESS,
     )
     group.add_argument(
         "--insecure",
@@ -213,24 +222,34 @@ def add_default_arguments(
     return parser
 
 
-def generate_option_group(parser: optparse.OptionParser, prefix: str = "") -> optparse.OptionGroup:
-    logging.warning(
+def generate_option_group(
+    parser: optparse.OptionParser, prefix: str = ""
+) -> optparse.OptionGroup:
+    logger.warning(
         """zulip.generate_option_group is based on optparse, which
                     is now deprecated. We recommend migrating to argparse and
                     using zulip.add_default_arguments instead."""
     )
 
     group = optparse.OptionGroup(parser, "Zulip API configuration")
-    group.add_option(f"--{prefix}site", dest="zulip_site", help="Zulip server URI", default=None)
+    group.add_option(
+        f"--{prefix}site", dest="zulip_site", help="Zulip server URI", default=None
+    )
     group.add_option(f"--{prefix}api-key", dest="zulip_api_key", action="store")
-    group.add_option(f"--{prefix}user", dest="zulip_email", help="Email address of the calling bot or user.")
+    group.add_option(
+        f"--{prefix}user",
+        dest="zulip_email",
+        help="Email address of the calling bot or user.",
+    )
     group.add_option(
         f"--{prefix}config-file",
         action="store",
         dest="zulip_config_file",
         help="Location of an ini file containing the\nabove information. (default ~/.zuliprc)",
     )
-    group.add_option("-v", "--verbose", action="store_true", help="Provide detailed output.")
+    group.add_option(
+        "-v", "--verbose", action="store_true", help="Provide detailed output."
+    )
     group.add_option(
         f"--{prefix}client",
         action="store",
@@ -307,7 +326,9 @@ def get_default_config_filename() -> Optional[str]:
         return None
 
     config_file = os.path.join(os.environ["HOME"], ".zuliprc")
-    if not os.path.exists(config_file) and os.path.exists(os.path.join(os.environ["HOME"], ".humbugrc")):
+    if not os.path.exists(config_file) and os.path.exists(
+        os.path.join(os.environ["HOME"], ".humbugrc")
+    ):
         raise ZulipError(
             "The Zulip API configuration file is now ~/.zuliprc; please run:\n\n"
             "  mv ~/.humbugrc ~/.zuliprc\n"
@@ -403,7 +424,9 @@ class AsyncClient:
             site = site.rstrip("/")
             self.base_url = site
         else:
-            raise MissingURLError("Missing Zulip server URL; specify via --site or ~/.zuliprc.")
+            raise MissingURLError(
+                "Missing Zulip server URL; specify via --site or ~/.zuliprc."
+            )
 
         if not self.base_url.endswith("/api"):
             self.base_url += "/api"
@@ -434,7 +457,9 @@ class AsyncClient:
             if not os.path.isfile(client_cert):
                 raise ConfigNotFoundError(f"client cert '{client_cert}' does not exist")
             if client_cert_key is not None and not os.path.isfile(client_cert_key):
-                raise ConfigNotFoundError(f"client cert key '{client_cert_key}' does not exist")
+                raise ConfigNotFoundError(
+                    f"client cert key '{client_cert_key}' does not exist"
+                )
         self.client_cert = client_cert
         self.client_cert_key = client_cert_key
 
@@ -496,7 +521,10 @@ class AsyncClient:
 
         request_timeout = 90.0 if longpolling else timeout or 15.0
 
-        request = {key: val if isinstance(val, str) else json.dumps(val) for key, val in orig_request.items()}
+        request = {
+            key: val if isinstance(val, str) else json.dumps(val)
+            for key, val in orig_request.items()
+        }
         req_files = [(f.name, f) for f in files]
 
         await self.ensure_session()
@@ -541,16 +569,21 @@ class AsyncClient:
                 if files:
                     kwargs["files"] = req_files
 
+                full_url = urllib.parse.urljoin(self.base_url, url)
+                logger.debug(f"Making {method} request to {full_url} with {kwargs}")
+
                 res = await self.session.request(
                     method,
-                    urllib.parse.urljoin(self.base_url, url),
+                    full_url,
                     timeout=request_timeout,
                     **kwargs,
                 )
 
                 self.has_connected = True
 
-                if str(res.status_code).startswith("5") and error_retry(f" (server {res.status_code})"):
+                if str(res.status_code).startswith("5") and error_retry(
+                    f" (server {res.status_code})"
+                ):
                     await asyncio.sleep(1)
                     continue
 
@@ -561,7 +594,9 @@ class AsyncClient:
                 raise e
             except httpx.ConnectError as e:
                 if not self.has_connected:
-                    raise UnrecoverableNetworkError("cannot connect to server " + self.base_url) from e
+                    raise UnrecoverableNetworkError(
+                        "cannot connect to server " + full_url
+                    ) from e
                 if error_retry(""):
                     await asyncio.sleep(1)
                     continue
@@ -643,10 +678,18 @@ class AsyncClient:
                 queue_id, last_event_id = await do_register()
 
             try:
-                res = await self.get_events(queue_id=queue_id, last_event_id=last_event_id)
-            except (httpx.TimeoutException, httpx.ConnectError, httpx.RemoteProtocolError):
+                res = await self.get_events(
+                    queue_id=queue_id, last_event_id=last_event_id
+                )
+            except (
+                httpx.TimeoutException,
+                httpx.ConnectError,
+                httpx.RemoteProtocolError,
+            ):
                 if self.verbose:
-                    print(f"Connection error fetching events:\n{traceback.format_exc()}")
+                    print(
+                        f"Connection error fetching events:\n{traceback.format_exc()}"
+                    )
                 # RemoteProtocolError often indicates dropped long-poll; re-register next loop
                 queue_id = None
                 await asyncio.sleep(1)
@@ -663,7 +706,9 @@ class AsyncClient:
                 else:
                     if self.verbose:
                         print(f"Server returned error:\n{res.msg}")
-                    if res.model_extra.get("code") == "BAD_EVENT_QUEUE_ID" or res.msg.startswith(
+                    if res.model_extra.get(
+                        "code"
+                    ) == "BAD_EVENT_QUEUE_ID" or res.msg.startswith(
                         "Bad event queue id:"
                     ):
                         queue_id = None
@@ -680,7 +725,8 @@ class AsyncClient:
 
     async def call_on_each_message(
         self,
-        callback: Callable[[Dict[str, Any]], Awaitable[None]] | Callable[[Dict[str, Any]], None],
+        callback: Callable[[Dict[str, Any]], Awaitable[None]]
+        | Callable[[Dict[str, Any]], None],
         **kwargs: object,
     ) -> None:
         async def event_callback(event: Event) -> None:
@@ -700,31 +746,50 @@ class AsyncClient:
         if narrow is None:
             narrow = []
         request = dict(event_types=event_types, narrow=narrow, **kwargs)
-        return RegisterResponse.model_validate(await self.call_endpoint(url="register", request=request))
+        return RegisterResponse.model_validate(
+            await self.call_endpoint(url="register", request=request)
+        )
 
     async def get_events(self, **request: Any) -> EventsResponse:
         return EventsResponse.model_validate(
-            await self.call_endpoint(url="events", method="GET", longpolling=True, request=request)
+            await self.call_endpoint(
+                url="events", method="GET", longpolling=True, request=request
+            )
         )
 
-    async def deregister(self, queue_id: str, timeout: Optional[float] = None) -> Dict[str, Any]:
+    async def deregister(
+        self, queue_id: str, timeout: Optional[float] = None
+    ) -> Dict[str, Any]:
         request = dict(queue_id=queue_id)
-        return await self.call_endpoint(url="events", method="DELETE", request=request, timeout=timeout)
+        return await self.call_endpoint(
+            url="events", method="DELETE", request=request, timeout=timeout
+        )
 
     async def get_messages(self, message_filters: Dict[str, Any]) -> Dict[str, Any]:
-        return await self.call_endpoint(url="messages", method="GET", request=message_filters)
+        return await self.call_endpoint(
+            url="messages", method="GET", request=message_filters
+        )
 
-    async def check_messages_match_narrow(self, **request: Dict[str, Any]) -> Dict[str, Any]:
-        return await self.call_endpoint(url="messages/matches_narrow", method="GET", request=request)
+    async def check_messages_match_narrow(
+        self, **request: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        return await self.call_endpoint(
+            url="messages/matches_narrow", method="GET", request=request
+        )
 
     async def get_raw_message(self, message_id: int) -> Dict[str, str]:
         return await self.call_endpoint(url=f"messages/{message_id}", method="GET")
 
-    async def send_message(self, message_data: Dict[str, Any] | StreamMessageRequest | PrivateMessageRequest) -> SendMessageResponse:
+    async def send_message(
+        self,
+        message_data: Dict[str, Any] | StreamMessageRequest | PrivateMessageRequest,
+    ) -> SendMessageResponse:
         payload = message_data
         if hasattr(message_data, "model_dump"):
             payload = message_data.model_dump(exclude_none=True)
-        return SendMessageResponse.model_validate(await self.call_endpoint(url="messages", request=payload))
+        return SendMessageResponse.model_validate(
+            await self.call_endpoint(url="messages", request=payload)
+        )
 
     async def upload_file(self, file: IO[Any]) -> Dict[str, Any]:
         return await self.call_endpoint(url="user_uploads", files=[file])
@@ -743,15 +808,21 @@ class AsyncClient:
         return await self.call_endpoint(url=f"messages/{message_id}", method="DELETE")
 
     async def update_message_flags(self, update_data: Dict[str, Any]) -> Dict[str, Any]:
-        return await self.call_endpoint(url="messages/flags", method="POST", request=update_data)
+        return await self.call_endpoint(
+            url="messages/flags", method="POST", request=update_data
+        )
 
     async def mark_all_as_read(self) -> Dict[str, Any]:
         return await self.call_endpoint(url="mark_all_as_read", method="POST")
 
     async def mark_stream_as_read(self, stream_id: int) -> Dict[str, Any]:
-        return await self.call_endpoint(url="mark_stream_as_read", method="POST", request={"stream_id": stream_id})
+        return await self.call_endpoint(
+            url="mark_stream_as_read", method="POST", request={"stream_id": stream_id}
+        )
 
-    async def mark_topic_as_read(self, stream_id: int, topic_name: str) -> Dict[str, Any]:
+    async def mark_topic_as_read(
+        self, stream_id: int, topic_name: str
+    ) -> Dict[str, Any]:
         return await self.call_endpoint(
             url="mark_topic_as_read",
             method="POST",
@@ -759,7 +830,9 @@ class AsyncClient:
         )
 
     async def get_message_history(self, message_id: int) -> Dict[str, Any]:
-        return await self.call_endpoint(url=f"messages/{message_id}/history", method="GET")
+        return await self.call_endpoint(
+            url=f"messages/{message_id}/history", method="GET"
+        )
 
     async def add_reaction(self, reaction_data: Dict[str, Any]) -> Dict[str, Any]:
         return await self.call_endpoint(
@@ -778,11 +851,17 @@ class AsyncClient:
     async def get_realm_emoji(self) -> Dict[str, Any]:
         return await self.call_endpoint(url="realm/emoji", method="GET")
 
-    async def upload_custom_emoji(self, emoji_name: str, file_obj: IO[Any]) -> Dict[str, Any]:
-        return await self.call_endpoint(f"realm/emoji/{emoji_name}", method="POST", files=[file_obj])
+    async def upload_custom_emoji(
+        self, emoji_name: str, file_obj: IO[Any]
+    ) -> Dict[str, Any]:
+        return await self.call_endpoint(
+            f"realm/emoji/{emoji_name}", method="POST", files=[file_obj]
+        )
 
     async def delete_custom_emoji(self, emoji_name: str) -> Dict[str, Any]:
-        return await self.call_endpoint(url=f"realm/emoji/{emoji_name}", method="DELETE")
+        return await self.call_endpoint(
+            url=f"realm/emoji/{emoji_name}", method="DELETE"
+        )
 
     async def get_realm_linkifiers(self) -> Dict[str, Any]:
         return await self.call_endpoint(url="realm/linkifiers", method="GET")
@@ -792,30 +871,46 @@ class AsyncClient:
         # Feature level not known in async client; keep both keys for compatibility.
         data["url_template"] = url_template
         data["url_format_string"] = url_template
-        return await self.call_endpoint(url="realm/filters", method="POST", request=data)
+        return await self.call_endpoint(
+            url="realm/filters", method="POST", request=data
+        )
 
     async def remove_realm_filter(self, filter_id: int) -> Dict[str, Any]:
-        return await self.call_endpoint(url=f"realm/filters/{filter_id}", method="DELETE")
+        return await self.call_endpoint(
+            url=f"realm/filters/{filter_id}", method="DELETE"
+        )
 
     async def get_realm_profile_fields(self) -> Dict[str, Any]:
         return await self.call_endpoint(url="realm/profile_fields", method="GET")
 
     async def create_realm_profile_field(self, **request: Any) -> Dict[str, Any]:
-        return await self.call_endpoint(url="realm/profile_fields", method="POST", request=request)
+        return await self.call_endpoint(
+            url="realm/profile_fields", method="POST", request=request
+        )
 
     async def remove_realm_profile_field(self, field_id: int) -> Dict[str, Any]:
-        return await self.call_endpoint(url=f"realm/profile_fields/{field_id}", method="DELETE")
+        return await self.call_endpoint(
+            url=f"realm/profile_fields/{field_id}", method="DELETE"
+        )
 
     async def reorder_realm_profile_fields(self, **request: Any) -> Dict[str, Any]:
-        return await self.call_endpoint(url="realm/profile_fields", method="PATCH", request=request)
+        return await self.call_endpoint(
+            url="realm/profile_fields", method="PATCH", request=request
+        )
 
-    async def update_realm_profile_field(self, field_id: int, **request: Any) -> Dict[str, Any]:
-        return await self.call_endpoint(url=f"realm/profile_fields/{field_id}", method="PATCH", request=request)
+    async def update_realm_profile_field(
+        self, field_id: int, **request: Any
+    ) -> Dict[str, Any]:
+        return await self.call_endpoint(
+            url=f"realm/profile_fields/{field_id}", method="PATCH", request=request
+        )
 
     async def get_server_settings(self) -> Dict[str, Any]:
         return await self.call_endpoint(url="server_settings", method="GET")
 
-    async def get_profile(self, request: Optional[Dict[str, Any]] = None) -> UserProfileResponse:
+    async def get_profile(
+        self, request: Optional[Dict[str, Any]] = None
+    ) -> UserProfileResponse:
         return UserProfileResponse.model_validate(
             await self.call_endpoint(url="users/me", method="GET", request=request)
         )
@@ -826,10 +921,14 @@ class AsyncClient:
     async def get_realm_presence(self) -> Dict[str, Any]:
         return await self.call_endpoint(url="realm/presence", method="GET")
 
-    async def update_presence(self, request: Dict[str, Any] | UpdatePresenceRequest) -> Dict[str, Any]:
+    async def update_presence(
+        self, request: Dict[str, Any] | UpdatePresenceRequest
+    ) -> Dict[str, Any]:
         if hasattr(request, "model_dump"):
             request = request.model_dump(exclude_none=True)
-        return await self.call_endpoint(url="users/me/presence", method="POST", request=request)
+        return await self.call_endpoint(
+            url="users/me/presence", method="POST", request=request
+        )
 
     async def get_streams(self, **request: Any) -> Dict[str, Any]:
         return await self.call_endpoint(url="streams", method="GET", request=request)
@@ -845,24 +944,36 @@ class AsyncClient:
         return await self.call_endpoint(url=f"streams/{stream_id}", method="DELETE")
 
     async def add_default_stream(self, stream_id: int) -> Dict[str, Any]:
-        return await self.call_endpoint(url="default_streams", method="POST", request={"stream_id": stream_id})
+        return await self.call_endpoint(
+            url="default_streams", method="POST", request={"stream_id": stream_id}
+        )
 
     async def get_user_by_id(self, user_id: int, **request: Any) -> Dict[str, Any]:
-        return await self.call_endpoint(url=f"users/{user_id}", method="GET", request=request)
+        return await self.call_endpoint(
+            url=f"users/{user_id}", method="GET", request=request
+        )
 
     async def deactivate_user_by_id(self, user_id: int) -> Dict[str, Any]:
         return await self.call_endpoint(url=f"users/{user_id}", method="DELETE")
 
     async def reactivate_user_by_id(self, user_id: int) -> Dict[str, Any]:
-        return await self.call_endpoint(url=f"users/{user_id}/reactivate", method="POST")
+        return await self.call_endpoint(
+            url=f"users/{user_id}/reactivate", method="POST"
+        )
 
     async def update_user_by_id(self, user_id: int, **request: Any) -> Dict[str, Any]:
-        return await self.call_endpoint(url=f"users/{user_id}", method="PATCH", request=request)
+        return await self.call_endpoint(
+            url=f"users/{user_id}", method="PATCH", request=request
+        )
 
-    async def get_users(self, request: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def get_users(
+        self, request: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         return await self.call_endpoint(url="users", method="GET", request=request)
 
-    async def get_members(self, request: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def get_members(
+        self, request: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         return await self.get_users(request=request)
 
     async def get_alert_words(self) -> Dict[str, Any]:
@@ -870,24 +981,38 @@ class AsyncClient:
 
     async def add_alert_words(self, alert_words: List[str]) -> Dict[str, Any]:
         return await self.call_endpoint(
-            url="users/me/alert_words", method="POST", request={"alert_words": alert_words}
+            url="users/me/alert_words",
+            method="POST",
+            request={"alert_words": alert_words},
         )
 
     async def remove_alert_words(self, alert_words: List[str]) -> Dict[str, Any]:
         return await self.call_endpoint(
-            url="users/me/alert_words", method="DELETE", request={"alert_words": alert_words}
+            url="users/me/alert_words",
+            method="DELETE",
+            request={"alert_words": alert_words},
         )
 
-    async def get_subscriptions(self, request: Optional[Dict[str, Any]] = None) -> SubscriptionsResponse:
+    async def get_subscriptions(
+        self, request: Optional[Dict[str, Any]] = None
+    ) -> SubscriptionsResponse:
         return SubscriptionsResponse.model_validate(
-            await self.call_endpoint(url="users/me/subscriptions", method="GET", request=request)
+            await self.call_endpoint(
+                url="users/me/subscriptions", method="GET", request=request
+            )
         )
 
-    async def list_subscriptions(self, request: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        logger.warning("list_subscriptions() is deprecated. Please use get_subscriptions() instead.")
+    async def list_subscriptions(
+        self, request: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        logger.warning(
+            "list_subscriptions() is deprecated. Please use get_subscriptions() instead."
+        )
         return await self.get_subscriptions(request)
 
-    async def add_subscriptions(self, streams: Iterable[Dict[str, Any]], **kwargs: Any) -> Dict[str, Any]:
+    async def add_subscriptions(
+        self, streams: Iterable[Dict[str, Any]], **kwargs: Any
+    ) -> Dict[str, Any]:
         request = dict(subscriptions=streams, **kwargs)
         return await self.call_endpoint(url="users/me/subscriptions", request=request)
 
@@ -899,22 +1024,34 @@ class AsyncClient:
         request: Dict[str, object] = dict(subscriptions=streams)
         if principals is not None:
             request["principals"] = principals
-        return await self.call_endpoint(url="users/me/subscriptions", method="DELETE", request=request)
+        return await self.call_endpoint(
+            url="users/me/subscriptions", method="DELETE", request=request
+        )
 
-    async def get_subscription_status(self, user_id: int, stream_id: int) -> Dict[str, Any]:
-        return await self.call_endpoint(url=f"users/{user_id}/subscriptions/{stream_id}", method="GET")
+    async def get_subscription_status(
+        self, user_id: int, stream_id: int
+    ) -> Dict[str, Any]:
+        return await self.call_endpoint(
+            url=f"users/{user_id}/subscriptions/{stream_id}", method="GET"
+        )
 
     async def mute_topic(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        return await self.call_endpoint(url="users/me/subscriptions/muted_topics", method="PATCH", request=request)
+        return await self.call_endpoint(
+            url="users/me/subscriptions/muted_topics", method="PATCH", request=request
+        )
 
-    async def update_subscription_settings(self, subscription_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def update_subscription_settings(
+        self, subscription_data: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         return await self.call_endpoint(
             url="users/me/subscriptions/properties",
             method="POST",
             request={"subscription_data": subscription_data},
         )
 
-    async def update_notification_settings(self, notification_settings: Dict[str, Any]) -> Dict[str, Any]:
+    async def update_notification_settings(
+        self, notification_settings: Dict[str, Any]
+    ) -> Dict[str, Any]:
         return await self.call_endpoint(
             url="settings/notifications",
             method="PATCH",
@@ -932,25 +1069,33 @@ class AsyncClient:
         )
 
     async def get_stream_topics(self, stream_id: int) -> Dict[str, Any]:
-        return await self.call_endpoint(url=f"users/me/{stream_id}/topics", method="GET")
+        return await self.call_endpoint(
+            url=f"users/me/{stream_id}/topics", method="GET"
+        )
 
     async def get_stream_email_address(self, stream_id: int) -> Dict[str, Any]:
-        return await self.call_endpoint(url=f"streams/{stream_id}/email_address", method="GET")
+        return await self.call_endpoint(
+            url=f"streams/{stream_id}/email_address", method="GET"
+        )
 
-    async def get_user_groups(self, request: Optional[Dict[str, Any] | GetUserGroupsRequest] = None) -> GetUserGroupsResponse:
+    async def get_user_groups(
+        self, request: Optional[Dict[str, Any] | GetUserGroupsRequest] = None
+    ) -> GetUserGroupsResponse:
         payload = {}
         if request is not None:
             if hasattr(request, "model_dump"):
                 payload = request.model_dump(exclude_none=True)
             else:
                 payload = {k: v for k, v in request.items() if v is not None}
-        
+
         return GetUserGroupsResponse.model_validate(
             await self.call_endpoint(url="user_groups", method="GET", request=payload)
         )
 
     async def create_user_group(self, group_data: Dict[str, Any]) -> Dict[str, Any]:
-        return await self.call_endpoint(url="user_groups/create", method="POST", request=group_data)
+        return await self.call_endpoint(
+            url="user_groups/create", method="POST", request=group_data
+        )
 
     async def update_user_group(self, group_data: Dict[str, Any]) -> Dict[str, Any]:
         return await self.call_endpoint(
@@ -962,7 +1107,9 @@ class AsyncClient:
     async def remove_user_group(self, group_id: int) -> Dict[str, Any]:
         return await self.call_endpoint(url=f"user_groups/{group_id}", method="DELETE")
 
-    async def update_user_group_members(self, user_group_id: int, group_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def update_user_group_members(
+        self, user_group_id: int, group_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         return await self.call_endpoint(
             url=f"user_groups/{user_group_id}/members",
             method="POST",
@@ -977,17 +1124,29 @@ class AsyncClient:
         url = "streams/%d/members" % (stream_id,)
         return await self.call_endpoint(url=url, method="GET", request=request)
 
-    async def render_message(self, request: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        return await self.call_endpoint(url="messages/render", method="POST", request=request)
+    async def render_message(
+        self, request: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        return await self.call_endpoint(
+            url="messages/render", method="POST", request=request
+        )
 
-    async def create_user(self, request: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def create_user(
+        self, request: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         return await self.call_endpoint(method="POST", url="users", request=request)
 
     async def update_storage(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        return await self.call_endpoint(url="bot_storage", method="PUT", request=request)
+        return await self.call_endpoint(
+            url="bot_storage", method="PUT", request=request
+        )
 
-    async def get_storage(self, request: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        return await self.call_endpoint(url="bot_storage", method="GET", request=request)
+    async def get_storage(
+        self, request: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        return await self.call_endpoint(
+            url="bot_storage", method="GET", request=request
+        )
 
     async def set_typing_status(self, request: Dict[str, Any]) -> Dict[str, Any]:
         return await self.call_endpoint(url="typing", method="POST", request=request)
@@ -1015,7 +1174,9 @@ class AsyncClient:
 
         if message_id is None:
             if propagate_mode != "change_all":
-                raise AttributeError('A message_id must be provided if propagate_mode is not "change_all"')
+                raise AttributeError(
+                    'A message_id must be provided if propagate_mode is not "change_all"'
+                )
             result = await self.get_messages(
                 {
                     "anchor": "newest",
@@ -1030,7 +1191,10 @@ class AsyncClient:
             if result.get("result") != "success":
                 return result
             if len(result.get("messages", [])) <= 0:
-                return {"result": "error", "msg": f'No messages found in topic: "{topic}"'}
+                return {
+                    "result": "error",
+                    "msg": f'No messages found in topic: "{topic}"',
+                }
             message_id = result["messages"][0]["id"]
 
         request = {
@@ -1040,7 +1204,9 @@ class AsyncClient:
             "send_notification_to_old_thread": notify_old_topic,
             "send_notification_to_new_thread": notify_new_topic,
         }
-        return await self.call_endpoint(url=f"messages/{message_id}", method="PATCH", request=request)
+        return await self.call_endpoint(
+            url=f"messages/{message_id}", method="PATCH", request=request
+        )
 
     async def aclose(self) -> None:
         if self.session:
@@ -1056,7 +1222,12 @@ class ZulipStream:
         self.subject = subject
 
     async def write(self, content: str) -> None:
-        message = {"type": self.type, "to": self.to, "subject": self.subject, "content": content}
+        message = {
+            "type": self.type,
+            "to": self.to,
+            "subject": self.subject,
+            "content": content,
+        }
         await self.client.send_message(message)
 
     async def flush(self) -> None:

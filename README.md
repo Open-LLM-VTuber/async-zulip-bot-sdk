@@ -111,11 +111,12 @@ from bot_sdk import (
     Message,
     CommandSpec,
     CommandArgument,
-    setup_logging
+    setup_logging,
 )
 
 class MyBot(BaseBot):
     def __init__(self, client):
+        # BaseBot will receive a bot-specific logger when used via BotRunner / console
         super().__init__(client)
         # Register commands (prefixes come from bot.yaml)
         self.command_parser.register_spec(
@@ -129,7 +130,8 @@ class MyBot(BaseBot):
     
     async def on_start(self):
         """Called when bot starts"""
-        print(f"Bot started! User ID: {self._user_id}")
+        # Prefer structured logging over print
+        self.logger.info("Bot started! user_id={}", self._user_id)
     
     async def handle_echo(self, invocation, message, bot):
         """Handle echo command"""
@@ -138,6 +140,7 @@ class MyBot(BaseBot):
     
     async def on_message(self, message: Message):
         """Handle non-command messages"""
+        self.logger.debug("Incoming message: {}", message.content[:50])
         await self.send_reply(message, "Try !help to see available commands!")
 
 BOT_CLASS = MyBot

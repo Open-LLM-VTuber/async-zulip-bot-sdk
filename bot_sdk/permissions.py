@@ -41,7 +41,9 @@ class PermissionPolicy:
             cache: Optional[Dict[str, Any]] = await self.storage.get("__user_groups__")
             if cache and (time.time() - float(cache.get("ts", 0))) < self._cache_ttl:
                 try:
-                    groups = [UserGroup.model_validate(g) for g in cache.get("groups", [])]
+                    groups = [
+                        UserGroup.model_validate(g) for g in cache.get("groups", [])
+                    ]
                     return groups
                 except Exception:
                     pass
@@ -57,7 +59,10 @@ class PermissionPolicy:
         if self.storage:
             await self.storage.put(
                 "__user_groups__",
-                {"ts": time.time(), "groups": [g.model_dump(exclude_none=True) for g in groups]},
+                {
+                    "ts": time.time(),
+                    "groups": [g.model_dump(exclude_none=True) for g in groups],
+                },
             )
         return groups
 

@@ -21,8 +21,8 @@ class PrivateMessageRequest(BaseModel):
     content: str
 
     model_config = ConfigDict(extra="allow")
-    
-    
+
+
 class UpdatePresenceRequest(BaseModel):
     status: Literal["active", "idle"]
     new_user_input: Optional[bool] = None
@@ -39,4 +39,9 @@ class GetUserGroupsRequest(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
-__all__ = ["StreamMessageRequest", "PrivateMessageRequest", "UpdatePresenceRequest", "GetUserGroupsRequest"]
+__all__ = [
+    "StreamMessageRequest",
+    "PrivateMessageRequest",
+    "UpdatePresenceRequest",
+    "GetUserGroupsRequest",
+]

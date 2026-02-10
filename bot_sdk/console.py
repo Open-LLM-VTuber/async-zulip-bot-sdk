@@ -11,6 +11,7 @@ from loguru import logger
 
 from .config import AppConfig, load_config
 from .loader import BotSpec, discover_bot_factories
+from .log import DEFAULT_EXTRA, FILE_FORMAT, LOG_FOLDER, _coerce_compression
 from .runner import BotRunner
 from .db.cli import make_bot_migrations, run_bot_migrations
 
@@ -49,20 +50,6 @@ COMMAND_LIST = [
 ]
 
 
-COMMAND_LIST = [
-    "run",
-    "stop",
-    "reload",
-    "status",
-    "bots",
-    "help",
-    "exit",
-    "quit",
-    "makemigrations",
-    "migrate",
-]
-
-
 @dataclass
 class ManagedBot:
     spec: BotSpec
@@ -71,10 +58,11 @@ class ManagedBot:
 
 
 class BotManager:
-    def __init__(self, specs: Iterable[BotSpec]) -> None:
+    def __init__(self, specs: Iterable[BotSpec], log_level: str = "INFO") -> None:
         self._specs = {spec.name: spec for spec in specs}
         self._running: dict[str, ManagedBot] = {}
         self._lock = asyncio.Lock()
+        self._log_level = log_level
 
     @property
     def available_bots(self) -> list[str]:
@@ -92,7 +80,6 @@ class BotManager:
         results = await asyncio.gather(*tasks)
         return results
 
-
     async def start_bot(self, name: str) -> str:
         async with self._lock:
             if name in self._running:
@@ -105,6 +92,8 @@ class BotManager:
             spec.factory,
             client_kwargs={"config_file": spec.zuliprc},
             event_types=spec.event_types,
+            bot_name=spec.name,
+            log_level=self._log_level,
         )
         managed = ManagedBot(spec=spec, runner=runner)
         task = asyncio.create_task(self._run_runner(name, managed))
@@ -176,7 +165,9 @@ class ConsoleUI:
     can refresh it without touching the editing line.
     """
 
-    def __init__(self, manager: BotManager, log_buffer: LogBuffer, console: Console) -> None:
+    def __init__(
+        self, manager: BotManager, log_buffer: LogBuffer, console: Console
+    ) -> None:
         self.manager = manager
         self.log_buffer = log_buffer
         self.console = console
@@ -196,39 +187,51 @@ class ConsoleUI:
         # Calculate visible log lines based on console height
         # Approx height available for logs = total - status(5) - prompt(2) - borders(~7)
         log_height = max(8, self.console.height - 9)
-        
+
         lines = self.log_buffer.lines
         total_lines = len(lines)
-        
+
         # Calculate slice
         if self.scroll_offset > total_lines - log_height:
-             self.scroll_offset = max(0, total_lines - log_height)
-        
+            self.scroll_offset = max(0, total_lines - log_height)
+
         start_idx = max(0, total_lines - log_height - self.scroll_offset)
         end_idx = total_lines - self.scroll_offset if self.scroll_offset > 0 else None
-        
+
         visible_chunk = lines[start_idx:end_idx]
         log_content = Text.from_ansi("\n".join(visible_chunk))
-        
+
         title = f"Logs ({self.scroll_offset})" if self.scroll_offset > 0 else "Logs"
-        layout["logs"].update(Panel(log_content, title=title, border_style="cyan", padding=(0, 1)))
+        layout["logs"].update(
+            Panel(log_content, title=title, border_style="cyan", padding=(0, 1))
+        )
 
         status_table = Table.grid(expand=True, padding=(0, 10))
         status_table.add_column(justify="left", no_wrap=True, style="bold")
         status_table.add_column(justify="left", ratio=1, no_wrap=False)
-        status_table.add_row("Running", ", ".join(self.manager.running_bots) or "none", style="green")
-        status_table.add_row("Available", ", ".join(self.manager.available_bots) or "none", style="cyan")
-        help_text = _command_help_suggestions(command_buffer, self.manager.available_bots)
+        status_table.add_row(
+            "Running", ", ".join(self.manager.running_bots) or "none", style="green"
+        )
+        status_table.add_row(
+            "Available", ", ".join(self.manager.available_bots) or "none", style="cyan"
+        )
+        help_text = _command_help_suggestions(
+            command_buffer, self.manager.available_bots
+        )
         help_state = _command_help_state(command_buffer, self.manager.available_bots)
         help_cell = _render_help_cell(help_text, help_state)
         status_table.add_row("Command Help", help_cell, style="magenta")
-        layout["status"].update(Panel(status_table, title="Status", border_style="magenta", padding=(0, 1)))
+        layout["status"].update(
+            Panel(status_table, title="Status", border_style="magenta", padding=(0, 1))
+        )
 
         # Add cursor effect
         prompt_content = Text("bot-console> ", style="bold yellow")
         prompt_content.append(command_buffer)
         prompt_content.append("█", style="blink")
-        layout["prompt"].update(Panel(prompt_content, title="Command", border_style="green", padding=(0, 1)))
+        layout["prompt"].update(
+            Panel(prompt_content, title="Command", border_style="green", padding=(0, 1))
+        )
 
         return layout
 
@@ -421,7 +424,9 @@ async def _handle_command(
         _print_help(output_func, manager)
         return False
     if cmd == "bots":
-        output_func(f"Configured bots: {', '.join(manager.available_bots) if manager.available_bots else 'none'}")
+        output_func(
+            f"Configured bots: {', '.join(manager.available_bots) if manager.available_bots else 'none'}"
+        )
         return False
     if cmd == "status":
         running = manager.running_bots
@@ -479,7 +484,7 @@ async def _handle_command(
         # Stop bot if running to release file locks (important for migrations/reloads)
         if bot_name in manager.running_bots:
             await manager.stop_bot(bot_name, reason="reload")
-            
+
         result = await manager.reload_bot(spec)
         output_func(result)
         return False
@@ -517,7 +522,9 @@ async def _handle_command(
     return False
 
 
-async def _load_spec(bot_name: str, config_path: Path, bots_dir: str, reload_modules: bool) -> Optional[BotSpec]:
+async def _load_spec(
+    bot_name: str, config_path: Path, bots_dir: str, reload_modules: bool
+) -> Optional[BotSpec]:
     app_config = load_config(str(config_path), AppConfig)
     specs = discover_bot_factories(app_config, bots_dir, reload_modules=reload_modules)
     for spec in specs:
@@ -526,14 +533,18 @@ async def _load_spec(bot_name: str, config_path: Path, bots_dir: str, reload_mod
     return None
 
 
-async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", log_level: str = "INFO") -> None:
+async def run_console(
+    config_path: str = "bots.yaml", bots_dir: str = "bots", log_level: str = "INFO"
+) -> None:
     cfg_path = Path(config_path)
     if not cfg_path.exists():
-        raise FileNotFoundError("bots.yaml not found; please create it to list bots to launch")
+        raise FileNotFoundError(
+            "bots.yaml not found; please create it to list bots to launch"
+        )
 
     app_config = load_config(str(cfg_path), AppConfig)
     specs = discover_bot_factories(app_config, bots_dir)
-    manager: BotManager = BotManager(specs)
+    manager: BotManager = BotManager(specs, log_level=log_level)
 
     # Windows: keep Rich-based full-screen console with msvcrt key handling.
     use_rich_windows = _RICH_AVAILABLE and sys.platform.startswith("win")
@@ -551,11 +562,39 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
             def log_sink(message: str) -> None:
                 log_buffer.append(message)
 
+            # 在 Rich 控制台模式下，移除 stdout sink，保留文件 sink，并改为把日志写入 Rich 日志面板
             logger.remove()
-            # Restore styling and ensure ANSI codes are preserved for Text.from_ansi
+            logger.configure(extra=DEFAULT_EXTRA)
+
+            # 重新添加 system.log 文件 sink（与 setup_logging 一致，但不再写 stdout）
+            system_logger = logger.bind(bot_name="SYSTEM")
+            system_filter = lambda record: (
+                record.get("extra", {}).get("bot_name") == "SYSTEM"
+            )
+            system_logger.add(
+                LOG_FOLDER / "system.log",
+                level=log_level,
+                format=FILE_FORMAT,
+                enqueue=True,
+                rotation="12:00",
+                retention="1 week",
+                compression=_coerce_compression(True),
+                colorize=False,
+                filter=system_filter,
+            )
+
+            # 额外添加一个 Rich UI sink：所有级别的日志都会进 Logs 面板
             timefmt = "%Y-%m-%d %H:%M:%S"
-            fmt = "<green>{time:"+ timefmt +"}</green> |[<level>{level}</level>]| <cyan>{name} | line: {line}</cyan> | <level>{message}</level>"
-            logger.add(log_sink, format=fmt, level=log_level, enqueue=False, colorize=True)
+            fmt = (
+                "<magenta>{extra[bot_name]}</magenta> | "
+                "<green>{time:" + timefmt + "}</green> | "
+                "[<level>{level}</level>] | "
+                "<cyan>{name}:{line}</cyan> | "
+                "<level>{message}</level>"
+            )
+            logger.add(
+                log_sink, format=fmt, level=log_level, enqueue=True, colorize=True
+            )
 
             def output_to_logs(msg: str) -> None:
                 logger.info(msg)
@@ -594,7 +633,9 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
                                     command_history.insert(0, cmd)
                                 live.update(ui.render(command_buffer), refresh=True)
                                 logger.info(f"> {cmd}")  # Echo command to logs
-                                should_exit = await _handle_command(cmd, manager, cfg_path, bots_dir, output_to_logs)
+                                should_exit = await _handle_command(
+                                    cmd, manager, cfg_path, bots_dir, output_to_logs
+                                )
                                 if should_exit:
                                     await manager.stop_all()
                                     return
@@ -610,22 +651,30 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
                         elif ch in {b"\xe0", b"\x00"}:  # Arrow keys prefix
                             sc = msvcrt.getch()
                             if sc == b"H":  # Up
-                                if history_idx < len(command_history):
-                                    if history_idx == 0:
-                                        # (Optional) could save current draft
-                                        pass
-                                    command_buffer = command_history[history_idx]
-                                    history_idx += 1
-                            elif sc == b"P":  # Down
-                                if history_idx > 0:
-                                    history_idx -= 1
-                                    if history_idx == 0:
-                                        command_buffer = ""
-                                    else:
-                                        command_buffer = command_history[history_idx - 1]
+                                if not command_buffer and history_idx == 0:
+                                    ui.scroll_offset += 5
                                 else:
-                                    command_buffer = ""
-                                    history_idx = 0
+                                    if history_idx < len(command_history):
+                                        if history_idx == 0:
+                                            # (Optional) could save current draft
+                                            pass
+                                        command_buffer = command_history[history_idx]
+                                        history_idx += 1
+                            elif sc == b"P":  # Down
+                                if not command_buffer and history_idx == 0:
+                                    ui.scroll_offset = max(0, ui.scroll_offset - 5)
+                                else:
+                                    if history_idx > 0:
+                                        history_idx -= 1
+                                        if history_idx == 0:
+                                            command_buffer = ""
+                                        else:
+                                            command_buffer = command_history[
+                                                history_idx - 1
+                                            ]
+                                    else:
+                                        command_buffer = ""
+                                        history_idx = 0
                             elif sc == b"I":  # Page Up
                                 ui.scroll_offset += 5
                             elif sc == b"Q":  # Page Down

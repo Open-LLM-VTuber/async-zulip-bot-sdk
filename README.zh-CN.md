@@ -109,11 +109,12 @@ from bot_sdk import (
     Message,
     CommandSpec,
     CommandArgument,
-    setup_logging
+    setup_logging,
 )
 
 class MyBot(BaseBot):
     def __init__(self, client):
+        # 通过 BotRunner / 控制台启动时，BaseBot 会注入带有 Bot 名称标签的 logger
         super().__init__(client)
         # 注册命令（前缀来源于 bot.yaml）
         self.command_parser.register_spec(
@@ -127,7 +128,8 @@ class MyBot(BaseBot):
     
     async def on_start(self):
         """启动时调用"""
-        print(f"Bot started! User ID: {self._user_id}")
+        # 推荐使用结构化日志而不是 print
+        self.logger.info("Bot started! user_id={}", self._user_id)
     
     async def handle_echo(self, invocation, message, bot):
         """处理 echo 命令"""
@@ -136,6 +138,7 @@ class MyBot(BaseBot):
     
     async def on_message(self, message: Message):
         """处理非命令消息"""
+        self.logger.debug("Incoming message: {}", message.content[:50])
         await self.send_reply(message, "尝试使用 !help 查看可用命令！")
 
 BOT_CLASS = MyBot

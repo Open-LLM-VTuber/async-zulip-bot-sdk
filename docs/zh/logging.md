@@ -1,42 +1,50 @@
 # 日志系统 API
 
-Bot SDK 使用 [Loguru](https://github.com/Delgan/loguru) 作为日志库，提供简单而强大的日志功能。
+Bot SDK 使用 [Loguru](https://github.com/Delgan/loguru) 作为日志库，并将 **系统日志** 与 **Bot 日志** 分离，通过标签和不同的 sink 进行管理。
+
+整体设计：
+
+- SDK 内部、控制台、HTTP 客户端等日志统一标记为 `SYSTEM`，写入 `logs/system.log`。
+- 每个 Bot 会拥有自己的带标签的 logger，并可写入独立的日志文件，如 `logs/echo_bot.log`。
+- 交互式控制台中的 `Logs` 面板展示所有日志的合并视图，并通过标签区分来源。
 
 ## 控制台集成
 
-当运行交互式控制台 (`main.py`) 时：
-- 日志会自动被捕获并显示在 TUI 的 "Logs" 面板中。
-- 控制台 UI (基于 Rich) 会保留 ANSI 颜色，提供良好的阅读体验。
-- 支持通过 `PageUp`/`PageDown` 滚动查看历史日志。
+当运行交互式控制台（`async-zulip-bot` 或 `main.py`）时：
+
+- 所有 Loguru 日志（系统 + 各 Bot）都会显示在 TUI 的 `Logs` 面板中。
+- 每一行前面会带有一个标签（如 `SYSTEM`、`echo_bot`），用于区分日志来源。
+- 控制台 UI（基于 Rich）会保留 ANSI 颜色，提供良好的阅读体验。
+- 可以通过 `PageUp`/`PageDown`（以及在部分终端中通过鼠标滚轮）滚动查看历史日志。
 
 ## 快速开始
 
-### 基础用法
+### 基础用法（系统日志）
 
 ```python
 from bot_sdk import setup_logging
 
-# 设置日志（推荐在程序入口调用）
-setup_logging()
+# 设置系统级日志（推荐在程序入口调用）
+setup_logging(level="INFO", json_logs=False)
 ```
 
-### 在 Bot 中使用
+### 在 Bot 中使用（推荐用 self.logger）
 
 ```python
 from bot_sdk import BaseBot, Message
-from loguru import logger
 
 class MyBot(BaseBot):
     async def on_message(self, message: Message):
-        logger.info(f"Received message from {message.sender_full_name}")
-        logger.debug(f"Message content: {message.content}")
+        # 使用注入的 bot 专属 logger，带有 Bot 名称标签
+        self.logger.info("Received message from {}", message.sender_full_name)
+        self.logger.debug("Message content: {}", message.content)
         
         try:
             await self.send_reply(message, "Hello!")
-            logger.success("Reply sent successfully")
+            self.logger.success("Reply sent successfully")
         except Exception as e:
-            logger.error(f"Failed to send reply: {e}")
-            logger.exception("Full traceback:")
+            self.logger.error("Failed to send reply: {}", e)
+            self.logger.exception("Full traceback:")
 ```
 
 ## setup_logging()
@@ -46,20 +54,16 @@ from bot_sdk import setup_logging
 
 setup_logging(
     level: str = "INFO",
-    format: Optional[str] = None,
-    colorize: bool = True,
-    **kwargs
+    json_logs: bool = False,
 ) -> None
 ```
 
-配置日志系统。
+配置系统日志。
 
 ### 参数
 
-- **level** (`str`): 日志级别（默认 "INFO"）
-- **format** (`str`, 可选): 自定义日志格式
-- **colorize** (`bool`): 是否启用彩色输出（默认 `True`）
-- **kwargs**: 传递给 loguru 的其他参数
+- **level** (`str`): 日志级别（默认 `"INFO"`）
+- **json_logs** (`bool`): 是否使用 JSON 行格式输出（便于日志收集/分析），默认关闭时使用人类友好的彩色文本格式。
 
 
 ### 日志级别
@@ -77,21 +81,10 @@ setup_logging(
 
 ```python
 from bot_sdk import setup_logging
+from loguru import logger
 
-# 基础设置
-setup_logging()
-
-# 设置为 DEBUG 级别
 setup_logging(level="DEBUG")
-
-# 禁用彩色输出
-setup_logging(colorize=False)
-
-# 自定义格式
-setup_logging(
-    level="INFO",
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}"
-)
+logger.info("SDK 初始化完成")
 ```
 
 ## 日志方法
@@ -247,28 +240,20 @@ if __name__ == "__main__":
     run_bot(DetailedBot)
 ```
 
-### 日志到文件
+### Bot 专属日志文件
+
+多数情况下 SDK 会自动为每个 Bot 创建对应的文件 sink，无需手动配置：
+
+- `SYSTEM` 日志写入：`logs/system.log`
+- Bot 日志写入：`logs/<bot_name>.log`（例如 `logs/echo_bot.log`）
+
+如果你需要在独立脚本中手动获取 bot logger，可以使用：
 
 ```python
-from bot_sdk import BaseBot, Message, run_bot
-from loguru import logger
+from bot_sdk import get_bot_logger
 
-# 配置日志到文件
-logger.add(
-    "bot_{time:YYYY-MM-DD}.log",
-    rotation="1 day",      # 每天轮换
-    retention="7 days",    # 保留 7 天
-    level="INFO",
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}"
-)
-
-class FileLoggingBot(BaseBot):
-    async def on_message(self, message: Message):
-        logger.info(f"Received: {message.content}")
-        await self.send_reply(message, "Logged!")
-
-if __name__ == "__main__":
-    run_bot(FileLoggingBot)
+logger = get_bot_logger("echo_bot", level="INFO")
+logger.info("EchoBot starting...")
 ```
 
 ### 结构化日志

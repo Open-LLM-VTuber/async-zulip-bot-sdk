@@ -7,18 +7,13 @@ Commands:
     !stats - Show detailed statistics
 """
 
-from loguru import logger
-
 from bot_sdk import BaseBot, CommandInvocation, CommandSpec, Message
 
 
 class CounterBot(BaseBot):
     """A simple bot that counts messages using persistent storage."""
 
-    def __init__(self, client):
-        super().__init__(client)
-        
-        # Register commands
+    def register_commands(self) -> None:
         self.command_parser.register_spec(
             CommandSpec(
                 name="count",
@@ -26,7 +21,7 @@ class CounterBot(BaseBot):
                 handler=self._handle_count,
             )
         )
-        
+
         self.command_parser.register_spec(
             CommandSpec(
                 name="reset",
@@ -34,7 +29,7 @@ class CounterBot(BaseBot):
                 handler=self._handle_reset,
             )
         )
-        
+
         self.command_parser.register_spec(
             CommandSpec(
                 name="stats",
@@ -43,7 +38,9 @@ class CounterBot(BaseBot):
             )
         )
 
-    async def _handle_count(self, invocation: CommandInvocation, message: Message, bot: BaseBot) -> None:
+    async def _handle_count(
+        self, invocation: CommandInvocation, message: Message, bot: BaseBot
+    ) -> None:
         """Increment and display counter using cached storage."""
         if not self.storage:
             await self.send_reply(message, "❌ Storage is not enabled!")
@@ -65,7 +62,9 @@ class CounterBot(BaseBot):
             message, f"🔢 Count: **{counter}** (Total messages: {total})"
         )
 
-    async def _handle_reset(self, invocation: CommandInvocation, message: Message, bot: BaseBot) -> None:
+    async def _handle_reset(
+        self, invocation: CommandInvocation, message: Message, bot: BaseBot
+    ) -> None:
         """Reset counter to zero."""
         if not self.storage:
             await self.send_reply(message, "❌ Storage is not enabled!")
@@ -74,7 +73,9 @@ class CounterBot(BaseBot):
         await self.storage.put("counter", 0)
         await self.send_reply(message, "✅ Counter reset to 0")
 
-    async def _handle_stats(self, invocation: CommandInvocation, message: Message, bot: BaseBot) -> None:
+    async def _handle_stats(
+        self, invocation: CommandInvocation, message: Message, bot: BaseBot
+    ) -> None:
         """Show detailed statistics."""
         if not self.storage:
             await self.send_reply(message, "❌ Storage is not enabled!")
@@ -98,12 +99,12 @@ class CounterBot(BaseBot):
     async def on_message(self, message: Message) -> None:
         """Handle non-command messages."""
         # Only respond to simple text, commands are handled automatically
-        logger.debug(f"CounterBot received message: {message.content[:50]}")
+        self.logger.debug(f"CounterBot received message: {message.content[:50]}")
 
 
 # Factory function for main.py to discover
-def create_bot(client):
-    return CounterBot(client)
+def create_bot(client, logger):
+    return CounterBot(client, logger)
 
 
 BOT_CLASS = CounterBot

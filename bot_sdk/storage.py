@@ -26,7 +26,7 @@ _Deleted = object()
 class BotStorage:
     """
     Persistent key-value storage backed by SQLite.
-    
+
     Provides dictionary-like interface for bot state persistence.
     """
 
@@ -42,7 +42,7 @@ class BotStorage:
     ) -> None:
         """
         Initialize bot storage.
-        
+
         Args:
             db_path: Path to SQLite database file
             namespace: Storage namespace to isolate different bots/contexts
@@ -53,7 +53,9 @@ class BotStorage:
         self._marshal = json.dumps
         self._demarshal = json.loads
         self._auto_cache = (
-            _AutoCache(self, auto_flush_interval, auto_flush_retry, auto_flush_max_retries)
+            _AutoCache(
+                self, auto_flush_interval, auto_flush_retry, auto_flush_max_retries
+            )
             if auto_cache
             else None
         )
@@ -88,7 +90,9 @@ class BotStorage:
             await db.close()
 
         self._initialized = True
-        logger.debug(f"Initialized storage at {self.db_path} with namespace '{self.namespace}'")
+        logger.debug(
+            f"Initialized storage at {self.db_path} with namespace '{self.namespace}'"
+        )
 
     async def _connect(self) -> aiosqlite.Connection:
         """Open a connection with SQLite pragmas tuned for concurrency (WAL)."""
@@ -101,7 +105,7 @@ class BotStorage:
     async def put(self, key: str, value: Any) -> None:
         """
         Store a value for the given key.
-        
+
         Args:
             key: Storage key (string)
             value: Any JSON-serializable value
@@ -117,11 +121,11 @@ class BotStorage:
     async def get(self, key: str, default: Any = None) -> Any:
         """
         Retrieve value for the given key.
-        
+
         Args:
             key: Storage key
             default: Default value if key doesn't exist
-            
+
         Returns:
             Stored value or default
         """
@@ -145,10 +149,10 @@ class BotStorage:
     async def contains(self, key: str) -> bool:
         """
         Check if key exists in storage.
-        
+
         Args:
             key: Storage key
-            
+
         Returns:
             True if key exists, False otherwise
         """
@@ -157,10 +161,14 @@ class BotStorage:
         if self._auto_cache:
             cached = self._auto_cache.get(key)
             if cached is _Deleted:
-                logger.trace(f"Storage [{self.namespace}]: contains('{key}') -> False (cached delete)")
+                logger.trace(
+                    f"Storage [{self.namespace}]: contains('{key}') -> False (cached delete)"
+                )
                 return False
             if cached is not _Missing:
-                logger.trace(f"Storage [{self.namespace}]: contains('{key}') -> True (cached)")
+                logger.trace(
+                    f"Storage [{self.namespace}]: contains('{key}') -> True (cached)"
+                )
                 return True
 
         exists = await self._contains_direct(key)
@@ -170,10 +178,10 @@ class BotStorage:
     async def delete(self, key: str) -> bool:
         """
         Delete a key from storage.
-        
+
         Args:
             key: Storage key
-            
+
         Returns:
             True if key was deleted, False if it didn't exist
         """
@@ -192,7 +200,7 @@ class BotStorage:
     async def keys(self) -> List[str]:
         """
         Get all keys in current namespace.
-        
+
         Returns:
             List of all keys
         """
@@ -217,7 +225,7 @@ class BotStorage:
     def set_marshal(self, marshal_fn: callable, demarshal_fn: callable) -> None:
         """
         Set custom marshaling functions for serialization.
-        
+
         Args:
             marshal_fn: Function to serialize values (value -> str)
             demarshal_fn: Function to deserialize values (str -> value)
@@ -318,17 +326,17 @@ class BotStorage:
     async def cached(self, keys: Optional[List[str]] = None):
         """
         Context manager for cached storage operations.
-        
+
         Minimizes database round-trips by:
         - Pre-fetching specified keys
         - Batching writes until flush or context exit
-        
+
         Args:
             keys: List of keys to pre-fetch (None = don't pre-fetch)
-            
+
         Yields:
             CachedStorage instance
-            
+
         Example:
             async with storage.cached(["counter", "users"]) as cache:
                 count = cache.get("counter", 0)
@@ -346,7 +354,7 @@ class BotStorage:
 class CachedStorage:
     """
     Cached wrapper around BotStorage for batch operations.
-    
+
     Minimizes database I/O by caching reads and batching writes.
     """
 
@@ -369,7 +377,7 @@ class CachedStorage:
     def put(self, key: str, value: Any) -> None:
         """
         Store value in cache (will be flushed later).
-        
+
         Args:
             key: Storage key
             value: Any JSON-serializable value
@@ -380,14 +388,14 @@ class CachedStorage:
     def get(self, key: str, default: Any = None) -> Any:
         """
         Get value from cache.
-        
+
         Note: Only returns values that are in cache. If you need a key that wasn't
         pre-fetched, you must include it in the cached() keys list.
-        
+
         Args:
             key: Storage key
             default: Default value if key doesn't exist in cache
-            
+
         Returns:
             Cached value or default
         """
@@ -400,18 +408,18 @@ class CachedStorage:
                 f"Cache miss for '{key}' - key was not pre-fetched. "
                 "Include it in cached() keys list for better performance."
             )
-        
+
         return default
 
     def contains(self, key: str) -> bool:
         """
         Check if key exists in cache.
-        
+
         Note: Only checks cache, not underlying storage.
-        
+
         Args:
             key: Storage key
-            
+
         Returns:
             True if key is in cache
         """
@@ -420,7 +428,7 @@ class CachedStorage:
     async def flush_one(self, key: str) -> None:
         """
         Flush a single key's changes to storage.
-        
+
         Args:
             key: Storage key to flush
         """
@@ -456,7 +464,9 @@ class _AutoCache:
     Designed to yield to ORM usage by retrying when locked.
     """
 
-    def __init__(self, storage: BotStorage, interval: float, retry_delay: float, max_retries: int) -> None:
+    def __init__(
+        self, storage: BotStorage, interval: float, retry_delay: float, max_retries: int
+    ) -> None:
         self._storage = storage
         self._interval = interval
         self._retry_delay = retry_delay

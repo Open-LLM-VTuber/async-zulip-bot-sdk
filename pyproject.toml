@@ -1,7 +1,7 @@
 [project]
 name = "async-zulip-bot-sdk"
-version = "1.2.0"
-description = "Add your description here"
+version = "1.3.0"
+description = "Async, type-safe Zulip bot development framework"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -19,3 +19,15 @@ dependencies = [
 
 [project.scripts]
 async-zulip-bot = "bot_sdk.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.15.0",
+    "black>=26.1.0",
+    "isort>=7.0.0",
+    "mypy>=1.19.1",
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+    "pytest-cov>=7.0.0",
+    "pre-commit>=4.5.1",
+]
