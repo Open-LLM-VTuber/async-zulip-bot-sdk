@@ -1,7 +1,7 @@
 """Initial empty migration placeholder.
 
 Revision ID: 0001_initial
-Revises: 
+Revises:
 Create Date: 2026-01-10
 """
 

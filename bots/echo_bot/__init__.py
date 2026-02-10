@@ -2,7 +2,6 @@ from bot_sdk import BaseBot, CommandArgument, CommandInvocation, CommandSpec, Me
 
 
 class EchoBot(BaseBot):
-
     def register_commands(self) -> None:
         self.command_parser.register_spec(
             CommandSpec(
@@ -13,9 +12,13 @@ class EchoBot(BaseBot):
             )
         )
 
-    async def _handle_echo(self, invocation: CommandInvocation, message: Message, bot: BaseBot):
+    async def _handle_echo(
+        self, invocation: CommandInvocation, message: Message, bot: BaseBot
+    ):
         text_parts = invocation.args.get("text") or []
-        payload = " ".join(text_parts) if isinstance(text_parts, list) else str(text_parts)
+        payload = (
+            " ".join(text_parts) if isinstance(text_parts, list) else str(text_parts)
+        )
         await self.send_reply(message, payload)
 
     async def on_message(self, message: Message):

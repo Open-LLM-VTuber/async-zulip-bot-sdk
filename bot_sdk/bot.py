@@ -12,14 +12,24 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from .log import Logger
 from .async_zulip import AsyncClient
 from .commands import CommandArgument, CommandInvocation, CommandParser, CommandSpec
-from .config import BotLocalConfig, StorageConfig, load_bot_local_config, save_bot_local_config
-from .db.database import create_engine, create_sessionmaker, make_sqlite_url, session_scope
+from .config import (
+    BotLocalConfig,
+    StorageConfig,
+    load_bot_local_config,
+    save_bot_local_config,
+)
+from .db.database import (
+    create_engine,
+    create_sessionmaker,
+    make_sqlite_url,
+    session_scope,
+)
 from .models import (
     Event,
     Message,
     PrivateMessageRequest,
     StreamMessageRequest,
-    UpdatePresenceRequest
+    UpdatePresenceRequest,
 )
 from .permissions import PermissionPolicy
 from .storage import BotStorage
@@ -73,7 +83,7 @@ class BaseBot(abc.ABC):
     def set_storage_config(self, storage_config: Optional[StorageConfig]) -> None:
         """Inject per-bot storage configuration from runner/config layer."""
         self.storage_config = storage_config
-        
+
     async def post_init(self) -> None:
         """Hook for post-initialization logic. Override if needed.
 
@@ -142,7 +152,9 @@ class BaseBot(abc.ABC):
                 self.orm_db_path = f"bot_data/{db_name}.sqlite"
 
         db_url = make_sqlite_url(self.orm_db_path)
-        self.logger.info(f"Initializing ORM database for {self.__class__.__name__} at {db_url}")
+        self.logger.info(
+            f"Initializing ORM database for {self.__class__.__name__} at {db_url}"
+        )
         self._orm_engine = create_engine(db_url)
         self._orm_session_factory = create_sessionmaker(self._orm_engine)
 
@@ -160,10 +172,14 @@ class BaseBot(abc.ABC):
         self.language = lang
         try:
             self.i18n = build_i18n_for_bot(lang, self.__class__.__module__)
-            self.logger.info(f"Initialized i18n for {self.__class__.__name__} with language '{lang}'")
+            self.logger.info(
+                f"Initialized i18n for {self.__class__.__name__} with language '{lang}'"
+            )
         except Exception as exc:  # pragma: no cover - i18n should not block bot startup
             self.i18n = None
-            self.logger.warning(f"Failed to initialize i18n for {self.__class__.__name__}: {exc}")
+            self.logger.warning(
+                f"Failed to initialize i18n for {self.__class__.__name__}: {exc}"
+            )
 
     async def _load_settings(self) -> None:
         """Load per-bot settings YAML next to the bot module by default."""
@@ -173,11 +189,15 @@ class BaseBot(abc.ABC):
             mod_file = inspect.getfile(mod)
             default_path = Path(mod_file).parent / "bot.yaml"
         except Exception:
-            self.logger.warning("Failed to determine bot module path, using ./bot.yaml for settings")
+            self.logger.warning(
+                "Failed to determine bot module path, using ./bot.yaml for settings"
+            )
             default_path = Path("bot.yaml")
         # Load settings
         if not default_path.exists():
-            self.logger.info(f"No bot settings file found at {default_path}, using defaults.")
+            self.logger.info(
+                f"No bot settings file found at {default_path}, using defaults."
+            )
             self.settings = BotLocalConfig()
             self._settings_path = default_path  # type: ignore[attr-defined]
             await self.save_settings()  # Save default config
@@ -194,17 +214,23 @@ class BaseBot(abc.ABC):
             # Fallback to safe default if config left empty
             self.command_prefixes = ("!",)
         self.enable_mention_commands = bool(
-            overrides.enable_mention_commands if overrides.enable_mention_commands is not None else True
+            overrides.enable_mention_commands
+            if overrides.enable_mention_commands is not None
+            else True
         )
         self.auto_help_command = bool(
-            overrides.auto_help_command if overrides.auto_help_command is not None else True
+            overrides.auto_help_command
+            if overrides.auto_help_command is not None
+            else True
         )
         self.enable_storage = bool(
             overrides.enable_storage if overrides.enable_storage is not None else True
         )
         self.storage_path = overrides.storage_path
         self.storage_config = overrides.storage or StorageConfig()
-        self.enable_orm = bool(overrides.enable_orm) if overrides.enable_orm is not None else False
+        self.enable_orm = (
+            bool(overrides.enable_orm) if overrides.enable_orm is not None else False
+        )
         self.orm_db_path = overrides.orm_db_path
 
         # Recreate command parser to honor updated prefixes/mentions/help flags
@@ -225,7 +251,9 @@ class BaseBot(abc.ABC):
             self.logger.debug("Loaded bot profile from storage cache")
             email = profile_data.get("email")
         else:
-            self.logger.debug("Fetching bot profile for command parser identity aliases")
+            self.logger.debug(
+                "Fetching bot profile for command parser identity aliases"
+            )
             profile = await self.client.get_profile()
             profile_data = {
                 "user_id": profile.user_id,
@@ -239,7 +267,9 @@ class BaseBot(abc.ABC):
         self._user_id = profile_data["user_id"]
         self._user_name = profile_data["full_name"]
         self.command_parser.add_identity_aliases(full_name=self._user_name, email=email)
-        self.logger.info(f"{self.__class__.__name__} started with user_id: {self._user_id}")
+        self.logger.info(
+            f"{self.__class__.__name__} started with user_id: {self._user_id}"
+        )
 
     async def _set_presence(self) -> None:
         """Set active presence on startup."""
@@ -260,15 +290,34 @@ class BaseBot(abc.ABC):
             )
         )
         # Permissions management command (restricted by min_level)
-        default_levels = (self.settings.role_levels if self.settings else {"user": 1, "admin": 50, "owner": 100, "bot_owner": 200})
+        default_levels = (
+            self.settings.role_levels
+            if self.settings
+            else {"user": 1, "admin": 50, "owner": 100, "bot_owner": 200}
+        )
         self.command_parser.register_spec(
             CommandSpec(
                 name="perm",
                 description=self.tr("Manage bot permissions"),
                 args=[
-                    CommandArgument("action", str, required=True, description="Action: set_owner | roles_show | roles_set | allow_stop | deny_stop"),
-                    CommandArgument("arg1", str, required=False, description="First argument (user_id or role) depending on action"),
-                    CommandArgument("arg2", str, required=False, description="Second argument (level) for roles_set"),
+                    CommandArgument(
+                        "action",
+                        str,
+                        required=True,
+                        description="Action: set_owner | roles_show | roles_set | allow_stop | deny_stop",
+                    ),
+                    CommandArgument(
+                        "arg1",
+                        str,
+                        required=False,
+                        description="First argument (user_id or role) depending on action",
+                    ),
+                    CommandArgument(
+                        "arg2",
+                        str,
+                        required=False,
+                        description="Second argument (level) for roles_set",
+                    ),
                 ],
                 handler=self._handle_perm,
                 min_level=default_levels.get("bot_owner", 200),
@@ -351,15 +400,25 @@ class BaseBot(abc.ABC):
         async with session_scope(self._orm_session_factory) as session:
             yield session
 
-    async def _handle_whoami(self, invocation: CommandInvocation, message: Message, bot: BaseBot) -> None:
+    async def _handle_whoami(
+        self, invocation: CommandInvocation, message: Message, bot: BaseBot
+    ) -> None:
         """Show permission-related info for the caller."""
         user_id = message.sender_id
         # Determine level by config priorities
-        role_levels = (self.settings.role_levels if self.settings else {"user": 1, "admin": 50, "owner": 100, "bot_owner": 200})
+        role_levels = (
+            self.settings.role_levels
+            if self.settings
+            else {"user": 1, "admin": 50, "owner": 100, "bot_owner": 200}
+        )
         level = role_levels.get("user", 1)
         roles: list[str] = ["user"]
         # Bot owner
-        if self.settings and self.settings.owner_user_id and user_id == self.settings.owner_user_id:
+        if (
+            self.settings
+            and self.settings.owner_user_id
+            and user_id == self.settings.owner_user_id
+        ):
             level = max(level, role_levels.get("bot_owner", 200))
             roles.append("bot_owner")
         # Org admin/owner
@@ -382,7 +441,9 @@ class BaseBot(abc.ABC):
         )
         await self.send_reply(message, text)
 
-    async def _handle_perm(self, invocation: CommandInvocation, message: Message, bot: BaseBot) -> None:
+    async def _handle_perm(
+        self, invocation: CommandInvocation, message: Message, bot: BaseBot
+    ) -> None:
         action = (invocation.args.get("action") or "").lower()
         arg1 = invocation.args.get("arg1")
         arg2 = invocation.args.get("arg2")
@@ -395,7 +456,9 @@ class BaseBot(abc.ABC):
 
         if action == "set_owner":
             if not arg1:
-                await self.send_reply(message, err(self.tr("Usage: !perm set_owner <user_id>")))
+                await self.send_reply(
+                    message, err(self.tr("Usage: !perm set_owner <user_id>"))
+                )
                 return
             try:
                 new_owner = int(arg1)
@@ -406,18 +469,32 @@ class BaseBot(abc.ABC):
                 self.settings = BotLocalConfig()
             self.settings.owner_user_id = new_owner
             await self.save_settings()
-            await self.send_reply(message, ok(self.tr("Bot owner set to {user_id}", user_id=new_owner)))
+            await self.send_reply(
+                message, ok(self.tr("Bot owner set to {user_id}", user_id=new_owner))
+            )
             return
 
         if action == "roles_show":
-            role_levels = (self.settings.role_levels if self.settings else {"user": 1, "admin": 50, "owner": 100, "bot_owner": 200})
-            lines = [f"{k}: {v}" for k, v in sorted(role_levels.items(), key=lambda kv: kv[1])]
-            await self.send_reply(message, self.tr("Current role levels:\n{lines}", lines="\n".join(lines)))
+            role_levels = (
+                self.settings.role_levels
+                if self.settings
+                else {"user": 1, "admin": 50, "owner": 100, "bot_owner": 200}
+            )
+            lines = [
+                f"{k}: {v}"
+                for k, v in sorted(role_levels.items(), key=lambda kv: kv[1])
+            ]
+            await self.send_reply(
+                message,
+                self.tr("Current role levels:\n{lines}", lines="\n".join(lines)),
+            )
             return
 
         if action == "roles_set":
             if not arg1 or not arg2:
-                await self.send_reply(message, err(self.tr("Usage: !perm roles_set <role> <level>")))
+                await self.send_reply(
+                    message, err(self.tr("Usage: !perm roles_set <role> <level>"))
+                )
                 return
             role = str(arg1)
             try:
@@ -429,12 +506,21 @@ class BaseBot(abc.ABC):
                 self.settings = BotLocalConfig()
             self.settings.role_levels[role] = level
             await self.save_settings()
-            await self.send_reply(message, ok(self.tr("Role '{role}' level set to {level}", role=role, level=level)))
+            await self.send_reply(
+                message,
+                ok(
+                    self.tr(
+                        "Role '{role}' level set to {level}", role=role, level=level
+                    )
+                ),
+            )
             return
 
         if action == "allow_stop":
             if not arg1:
-                await self.send_reply(message, err(self.tr("Usage: !perm allow_stop <user_id>")))
+                await self.send_reply(
+                    message, err(self.tr("Usage: !perm allow_stop <user_id>"))
+                )
                 return
             try:
                 uid = int(arg1)
@@ -447,14 +533,27 @@ class BaseBot(abc.ABC):
                 if uid not in acl:
                     acl.append(uid)
                     await self.storage.put("acl.stop", acl)
-                    await self.send_reply(message, ok(self.tr("User {user_id} allowed to stop bot", user_id=uid)))
+                    await self.send_reply(
+                        message,
+                        ok(self.tr("User {user_id} allowed to stop bot", user_id=uid)),
+                    )
                 else:
-                    await self.send_reply(message, ok(self.tr("User {user_id} is already allowed to stop bot", user_id=uid)))
+                    await self.send_reply(
+                        message,
+                        ok(
+                            self.tr(
+                                "User {user_id} is already allowed to stop bot",
+                                user_id=uid,
+                            )
+                        ),
+                    )
             return
 
         if action == "deny_stop":
             if not arg1:
-                await self.send_reply(message, err(self.tr("Usage: !perm deny_stop <user_id>")))
+                await self.send_reply(
+                    message, err(self.tr("Usage: !perm deny_stop <user_id>"))
+                )
                 return
             try:
                 uid = int(arg1)
@@ -466,12 +565,23 @@ class BaseBot(abc.ABC):
                 acl = await self.storage.get("acl.stop", [])
                 acl = [x for x in acl if x != uid]
                 await self.storage.put("acl.stop", acl)
-            await self.send_reply(message, ok(self.tr("User {user_id} denied to stop bot", user_id=uid)))
+            await self.send_reply(
+                message, ok(self.tr("User {user_id} denied to stop bot", user_id=uid))
+            )
             return
 
-        await self.send_reply(message, err(self.tr("Unknown action. Use: set_owner | roles_show | roles_set | allow_stop | deny_stop")))
+        await self.send_reply(
+            message,
+            err(
+                self.tr(
+                    "Unknown action. Use: set_owner | roles_show | roles_set | allow_stop | deny_stop"
+                )
+            ),
+        )
 
-    async def _handle_reload(self, invocation: CommandInvocation, message: Message, bot: BaseBot) -> None:
+    async def _handle_reload(
+        self, invocation: CommandInvocation, message: Message, bot: BaseBot
+    ) -> None:
         """Reload bot settings (bot.yaml) and i18n files without restart."""
         # Reload settings from disk if we know where they live.
         try:
@@ -484,11 +594,15 @@ class BaseBot(abc.ABC):
                 self.settings = load_bot_local_config(settings_path)
                 self.logger.info(f"Reloaded bot settings from {settings_path}")
             else:
-                self.logger.warning("No settings path available for reload; skipping settings reload")
+                self.logger.warning(
+                    "No settings path available for reload; skipping settings reload"
+                )
 
             # Reinitialize i18n based on the possibly updated language.
             await self._init_i18n()
-            await self.send_reply(message, f"✅ {self.tr('Configuration and translations reloaded.')}")
+            await self.send_reply(
+                message, f"✅ {self.tr('Configuration and translations reloaded.')}"
+            )
         except Exception as exc:
             self.logger.warning(f"Reload failed: {exc}")
             await self.send_reply(
@@ -497,12 +611,20 @@ class BaseBot(abc.ABC):
                 + self.tr("Failed to reload configuration: {error}", error=str(exc)),
             )
 
-    async def _handle_stop(self, invocation: CommandInvocation, message: Message, bot: BaseBot) -> None:
+    async def _handle_stop(
+        self, invocation: CommandInvocation, message: Message, bot: BaseBot
+    ) -> None:
         """Stop the bot if the caller is authorized."""
         requester = message.sender_id
         # Compute unified permission level (handles bot_owner, org owner/admin) and fallback ACL.
-        role_levels = (self.settings.role_levels if self.settings else {"user": 1, "admin": 50, "owner": 100, "bot_owner": 200})
-        stop_min = role_levels.get("admin", 50)  # admins/owners/bot_owner all meet or exceed this
+        role_levels = (
+            self.settings.role_levels
+            if self.settings
+            else {"user": 1, "admin": 50, "owner": 100, "bot_owner": 200}
+        )
+        stop_min = role_levels.get(
+            "admin", 50
+        )  # admins/owners/bot_owner all meet or exceed this
         try:
             user_level = await self._compute_user_level(requester)
         except Exception as exc:
@@ -518,14 +640,18 @@ class BaseBot(abc.ABC):
                 acl_allowed = False
 
         if user_level < stop_min and not acl_allowed:
-            await self.send_reply(message, self.tr("Permission denied: you cannot stop this bot."))
+            await self.send_reply(
+                message, self.tr("Permission denied: you cannot stop this bot.")
+            )
             return
 
         await self.send_reply(message, self.tr("🛑 Stopping the bot..."))
         if self._runner:
             self._runner.request_stop(reason=f"requested by user {requester}")
         else:
-            self.logger.warning("Stop requested but runner reference is missing; bot may keep running")
+            self.logger.warning(
+                "Stop requested but runner reference is missing; bot may keep running"
+            )
 
     async def get_user_level(self, user_id: int) -> int:
         """Public helper for resolving a user's permission level.
@@ -537,9 +663,17 @@ class BaseBot(abc.ABC):
         return await self._compute_user_level(user_id)
 
     async def _compute_user_level(self, user_id: int) -> int:
-        role_levels = (self.settings.role_levels if self.settings else {"user": 1, "admin": 50, "owner": 100, "bot_owner": 200})
+        role_levels = (
+            self.settings.role_levels
+            if self.settings
+            else {"user": 1, "admin": 50, "owner": 100, "bot_owner": 200}
+        )
         level = role_levels.get("user", 1)
-        if self.settings and self.settings.owner_user_id and user_id == self.settings.owner_user_id:
+        if (
+            self.settings
+            and self.settings.owner_user_id
+            and user_id == self.settings.owner_user_id
+        ):
             level = max(level, role_levels.get("bot_owner", 200))
         try:
             if self.perms and await self.perms.is_owner(user_id):
@@ -567,7 +701,7 @@ class BaseBot(abc.ABC):
 
     async def on_event(self, event: Event) -> None:
         """Main event handler. Default implementation dispatches commands and messages.
-        
+
         Override to handle other event types or customize behavior.
         But remember to call super().on_event(event) to retain command/message handling.
         """
@@ -580,7 +714,11 @@ class BaseBot(abc.ABC):
             # their arguments are missing or malformed.
             try:
                 raw_text = (event.message.content or "").strip()
-                spec = self.command_parser.find_command_spec(raw_text) if raw_text else None
+                spec = (
+                    self.command_parser.find_command_spec(raw_text)
+                    if raw_text
+                    else None
+                )
             except Exception:
                 spec = None
 
@@ -597,29 +735,40 @@ class BaseBot(abc.ABC):
                 command_invocation = self.parse_command(event.message)
             except Exception as exc:  # CommandError and others
                 self.logger.warning(f"Command parsing failed: {exc}")
-                await self.send_reply(event.message, self.tr("Command error: {error}", error=str(exc)))
+                await self.send_reply(
+                    event.message, self.tr("Command error: {error}", error=str(exc))
+                )
                 return
 
             if command_invocation is not None:
                 try:
-                    self.logger.debug(f"Dispatching command: {command_invocation.name} with args {command_invocation.args}")
+                    self.logger.debug(
+                        f"Dispatching command: {command_invocation.name} with args {command_invocation.args}"
+                    )
                     spec = command_invocation.spec
                     if spec and getattr(spec, "min_level", None) is not None:
-                        user_level = await self._compute_user_level(event.message.sender_id)
+                        user_level = await self._compute_user_level(
+                            event.message.sender_id
+                        )
                         if user_level < spec.min_level:  # type: ignore[attr-defined]
-                            await self.send_reply(event.message, self.tr("Permission denied."))
+                            await self.send_reply(
+                                event.message, self.tr("Permission denied.")
+                            )
                             return
-                    await self.command_parser.dispatch(command_invocation, message=event.message, bot=self)
+                    await self.command_parser.dispatch(
+                        command_invocation, message=event.message, bot=self
+                    )
                 except Exception as exc:
                     self.logger.warning(f"Command dispatch failed: {exc}")
-                    await self.send_reply(event.message, self.tr("Command error: {error}", error=str(exc)))
+                    await self.send_reply(
+                        event.message, self.tr("Command error: {error}", error=str(exc))
+                    )
             else:
                 self.logger.debug(f"Received message: {event.message}")
                 await self.on_message(event.message)
 
     @abc.abstractmethod
-    async def on_message(self, message: Message) -> None:
-        ...
+    async def on_message(self, message: Message) -> None: ...
 
     # Legacy hook retained for backwards compatibility; prefer per-command handlers.
     async def on_command(self, command: CommandInvocation, message: Message) -> None:
@@ -627,7 +776,9 @@ class BaseBot(abc.ABC):
 
     def parse_command(self, message: Message) -> CommandInvocation | None:
         if not self.command_parser:
-            raise RuntimeError("Command parser is not initialized; ensure post_init has run")
+            raise RuntimeError(
+                "Command parser is not initialized; ensure post_init has run"
+            )
         return self.command_parser.parse_message(message)
 
     async def send_reply(self, original: Message, content: str) -> None:
@@ -638,13 +789,17 @@ class BaseBot(abc.ABC):
                 # should not happen for private, but tolerate
                 to = []
             else:
-                to = [r.id for r in recipients_raw if getattr(r, "id", None) is not None]
+                to = [
+                    r.id for r in recipients_raw if getattr(r, "id", None) is not None
+                ]
             payload = PrivateMessageRequest(to=to, content=content)
         else:
             topic = original.topic_or_subject or "general"
             if original.stream_id is None:
                 raise ValueError("stream_id missing on stream message")
-            payload = StreamMessageRequest(to=original.stream_id, topic=topic, content=content)
+            payload = StreamMessageRequest(
+                to=original.stream_id, topic=topic, content=content
+            )
 
         await self.client.send_message(payload.model_dump(exclude_none=True))
 

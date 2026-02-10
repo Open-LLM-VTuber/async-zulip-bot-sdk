@@ -43,6 +43,7 @@ def load_config(path: str | Path, model: type[BaseModel]) -> BaseModel:
         data = yaml.load(f) or {}
     return model.model_validate(data)
 
+
 def save_config(path: str | Path, config: BaseModel) -> None:
     yaml = YAML()
     yaml.default_flow_style = False

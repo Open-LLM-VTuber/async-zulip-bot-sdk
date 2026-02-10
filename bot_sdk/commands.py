@@ -1,7 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Dict, Iterable, List, Optional, Protocol, Sequence
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Protocol,
+    Sequence,
+)
 
 from .models import Message
 
@@ -27,15 +37,13 @@ _FALSE_SET = frozenset(("false", "0", "no", "n", "off"))
 
 
 class SupportsSendReply(Protocol):
-    async def send_reply(self, message: Any, content: str) -> Any:
-        ...
+    async def send_reply(self, message: Any, content: str) -> Any: ...
 
 
 class Validator(Protocol):
     """Callable validator that may coerce or reject a value."""
 
-    def __call__(self, value: Any) -> Any:
-        ...
+    def __call__(self, value: Any) -> Any: ...
 
     def help_hint(self) -> Optional[str]:  # optional, but recommended
         ...
@@ -49,7 +57,9 @@ class OptionValidator:
     value.
     """
 
-    def __init__(self, options: Iterable[Any], *, case_insensitive: bool = False) -> None:
+    def __init__(
+        self, options: Iterable[Any], *, case_insensitive: bool = False
+    ) -> None:
         opts = list(options)
         if not opts:
             raise ValueError("options must not be empty")
@@ -108,7 +118,9 @@ class CommandSpec:
     args: List[CommandArgument] = field(default_factory=list)
     aliases: List[str] = field(default_factory=list)
     allow_extra: bool = False
-    handler: Optional[Callable[["CommandInvocation", Any, SupportsSendReply], Awaitable[None] | None]] = None
+    handler: Optional[
+        Callable[["CommandInvocation", Any, SupportsSendReply], Awaitable[None] | None]
+    ] = None
     show_in_help: bool = True
     # Minimum permission level required to execute this command (optional)
     min_level: Optional[int] = None
@@ -159,7 +171,14 @@ class CommandParser:
                     # order does not affect the final text.
                     description="Show available commands",
                     aliases=["?"],
-                    args=[CommandArgument("command", str, required=False, description="Command name for detailed help")],
+                    args=[
+                        CommandArgument(
+                            "command",
+                            str,
+                            required=False,
+                            description="Command name for detailed help",
+                        )
+                    ],
                     handler=self._handle_help,
                 )
             )
@@ -207,7 +226,9 @@ class CommandParser:
         if spec is None:
             raise UnknownCommandError(f"Unknown command: {command_name}")
         parsed_args = self._parse_args(tokens[1:], spec)
-        return CommandInvocation(name=spec.name, args=parsed_args, tokens=tokens, spec=spec)
+        return CommandInvocation(
+            name=spec.name, args=parsed_args, tokens=tokens, spec=spec
+        )
 
     def find_command_spec(self, text: str) -> Optional[CommandSpec]:
         """Return the CommandSpec for a raw message text, if any.
@@ -229,7 +250,9 @@ class CommandParser:
         command_name = self.alias_index.get(name_token, name_token)
         return self.specs.get(command_name)
 
-    async def dispatch(self, invocation: CommandInvocation, *, message: Any, bot: SupportsSendReply) -> None:
+    async def dispatch(
+        self, invocation: CommandInvocation, *, message: Any, bot: SupportsSendReply
+    ) -> None:
         handler = invocation.spec.handler
         if handler is None:
             raise CommandError(f"No handler registered for command: {invocation.name}")
@@ -241,14 +264,14 @@ class CommandParser:
         # Fast path: prefix match
         for prefix in self.prefixes:
             if text.startswith(prefix):
-                return text[len(prefix):].strip()
+                return text[len(prefix) :].strip()
 
         # Mention-based trigger
         if self.enable_mentions and self.mention_aliases:
             lowered = text.lower()
             for alias in self.mention_aliases:
                 if lowered.startswith(alias):
-                    return text[len(alias):].lstrip(" :,-")
+                    return text[len(alias) :].lstrip(" :,-")
         return None
 
     def _parse_args(self, args_tokens: List[str], spec: CommandSpec) -> Dict[str, Any]:
@@ -257,14 +280,18 @@ class CommandParser:
         for arg_spec in spec.args:
             if arg_spec.multiple:
                 remaining = args_tokens[idx:]
-                parsed[arg_spec.name] = [self._convert_value(token, arg_spec) for token in remaining]
+                parsed[arg_spec.name] = [
+                    self._convert_value(token, arg_spec) for token in remaining
+                ]
                 idx = len(args_tokens)
                 break
 
             if idx >= len(args_tokens):
                 if arg_spec.required:
                     usage = self._format_usage(spec)
-                    msg = self._tr("Missing argument: {name}").format(name=arg_spec.name)
+                    msg = self._tr("Missing argument: {name}").format(
+                        name=arg_spec.name
+                    )
                     usage_line = self._tr("Usage: {usage}").format(usage=usage)
                     raise InvalidArgumentsError(spec.name, f"{msg}\n{usage_line}")
                 parsed[arg_spec.name] = None
@@ -331,7 +358,11 @@ class CommandParser:
                 continue
             # If a user level is provided and the command requires a higher
             # level, hide it from the help output to keep things simple.
-            if user_level is not None and spec.min_level is not None and spec.min_level > user_level:
+            if (
+                user_level is not None
+                and spec.min_level is not None
+                and spec.min_level > user_level
+            ):
                 continue
             summary = self._format_usage(spec)
             if spec.description:
@@ -339,7 +370,9 @@ class CommandParser:
             lines.append(summary)
         return "\n".join(lines) if lines else "No commands registered."
 
-    async def _handle_help(self, invocation: CommandInvocation, message: Any, bot: SupportsSendReply) -> None:
+    async def _handle_help(
+        self, invocation: CommandInvocation, message: Any, bot: SupportsSendReply
+    ) -> None:
         # Default help handler: reply with generated help text.
         # Try to obtain the caller's permission level if the bot exposes it.
         user_level: Optional[int] = None
@@ -368,19 +401,33 @@ class CommandParser:
             # Try to use bot-level i18n if available.
             tr = getattr(bot, "tr", None)
             if callable(tr):
-                await bot.send_reply(message, tr("Unknown command: {name}", name=str(target)))
+                await bot.send_reply(
+                    message, tr("Unknown command: {name}", name=str(target))
+                )
             else:
                 await bot.send_reply(message, f"Unknown command: {target}")
             return
 
         # If we know the user's level and the command requires a higher level,
         # do not reveal full details.
-        if user_level is not None and spec.min_level is not None and user_level < spec.min_level:
+        if (
+            user_level is not None
+            and spec.min_level is not None
+            and user_level < spec.min_level
+        ):
             tr = getattr(bot, "tr", None)
             if callable(tr):
-                await bot.send_reply(message, tr("You do not have permission to use command: {name}", name=spec.name))
+                await bot.send_reply(
+                    message,
+                    tr(
+                        "You do not have permission to use command: {name}",
+                        name=spec.name,
+                    ),
+                )
             else:
-                await bot.send_reply(message, f"You do not have permission to use command: {spec.name}")
+                await bot.send_reply(
+                    message, f"You do not have permission to use command: {spec.name}"
+                )
             return
 
         detail = self._format_spec_detail(spec)
@@ -412,7 +459,9 @@ class CommandParser:
         if spec.args:
             lines.append(self._tr("Args:"))
             for arg in spec.args:
-                requirement = self._tr("required") if arg.required else self._tr("optional")
+                requirement = (
+                    self._tr("required") if arg.required else self._tr("optional")
+                )
                 multi = f" ({self._tr('multiple')})" if arg.multiple else ""
                 desc = f" - {arg.name}: {requirement}{multi}"
                 validator_hint = self._format_validator_hint(arg.validator)

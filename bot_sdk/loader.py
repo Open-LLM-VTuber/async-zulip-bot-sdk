@@ -46,7 +46,10 @@ def discover_bot_factories(
     for bot_cfg in config.bots:
         if not bot_cfg.enabled:
             continue
-        module_name = bot_cfg.module or f"{bots_dir.replace('/', '.').replace('\\', '.')}" + f".{bot_cfg.name}"
+        module_name = (
+            bot_cfg.module
+            or f"{bots_dir.replace('/', '.').replace('\\', '.')}" + f".{bot_cfg.name}"
+        )
         try:
             if reload_modules and module_name in sys.modules:
                 module = importlib.reload(sys.modules[module_name])
@@ -61,7 +64,9 @@ def discover_bot_factories(
             raise RuntimeError(f"No bot factory/class found in module {module_name}")
         zuliprc_path = Path(bot_cfg.zuliprc or base_path / bot_cfg.name / "zuliprc")
         if not zuliprc_path.exists():
-            raise FileNotFoundError(f"zuliprc not found for bot {bot_cfg.name}: {zuliprc_path}")
+            raise FileNotFoundError(
+                f"zuliprc not found for bot {bot_cfg.name}: {zuliprc_path}"
+            )
         specs.append(
             BotSpec(
                 name=bot_cfg.name,
@@ -74,7 +79,9 @@ def discover_bot_factories(
     return specs
 
 
-def _bind_factory(factory: Callable[..., BaseBot], bot_config: dict[str, Any]) -> Callable[[Any, Any], BaseBot]:
+def _bind_factory(
+    factory: Callable[..., BaseBot], bot_config: dict[str, Any]
+) -> Callable[[Any, Any], BaseBot]:
     def wrapper(client: Any, logger: Any) -> BaseBot:
         # Try common signatures in order while avoiding swallowing unrelated TypeErrors.
         attempts = [
@@ -99,7 +106,9 @@ def _bind_factory(factory: Callable[..., BaseBot], bot_config: dict[str, Any]) -
     return wrapper
 
 
-def _extract_factory(module, class_name: Optional[str] = None) -> Optional[Callable[[Any], BaseBot]]:
+def _extract_factory(
+    module, class_name: Optional[str] = None
+) -> Optional[Callable[[Any], BaseBot]]:
     if callable(getattr(module, "create_bot", None)):
         return module.create_bot
     if class_name:

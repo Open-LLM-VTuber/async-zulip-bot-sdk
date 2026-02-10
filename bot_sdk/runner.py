@@ -53,7 +53,9 @@ class BotRunner:
         if hasattr(self.bot, "set_runner"):
             self.bot.set_runner(self)
         await self.bot.post_init()
-        self._bot_logger.info("Bot '{}' started with event types {}", self.bot_name, self.event_types)
+        self._bot_logger.info(
+            "Bot '{}' started with event types {}", self.bot_name, self.event_types
+        )
         await self.client.ensure_session()
         await self.bot.on_start()
 
@@ -101,7 +103,9 @@ class BotRunner:
                     return
                 exc = t.exception()
                 if exc:
-                    self._bot_logger.exception("Unhandled error in bot event task: {}", exc)
+                    self._bot_logger.exception(
+                        "Unhandled error in bot event task: {}", exc
+                    )
 
             task.add_done_callback(_cleanup)
 
@@ -111,12 +115,19 @@ class BotRunner:
             self.event_types,
         )
         self._longpoll_task = asyncio.create_task(
-            self.client.call_on_each_event(_handle_event, self.event_types, self.narrow, stop_event=self._stop_event)
+            self.client.call_on_each_event(
+                _handle_event,
+                self.event_types,
+                self.narrow,
+                stop_event=self._stop_event,
+            )
         )
         stop_waiter = asyncio.create_task(self._stop_event.wait())
 
         try:
-            done, pending = await asyncio.wait({self._longpoll_task, stop_waiter}, return_when=asyncio.FIRST_COMPLETED)
+            done, pending = await asyncio.wait(
+                {self._longpoll_task, stop_waiter}, return_when=asyncio.FIRST_COMPLETED
+            )
             if stop_waiter in done:
                 self._bot_logger.info("Stop requested; cancelling event stream")
                 if self._longpoll_task:
@@ -126,7 +137,9 @@ class BotRunner:
                 exc = self._longpoll_task.exception() if self._longpoll_task else None
                 if exc:
                     raise exc
-                self._bot_logger.warning("Event stream completed unexpectedly; shutting down")
+                self._bot_logger.warning(
+                    "Event stream completed unexpectedly; shutting down"
+                )
                 self._stop_event.set()
         finally:
             if self._longpoll_task:

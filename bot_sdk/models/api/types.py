@@ -73,6 +73,7 @@ class User(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
+
 class Channel(BaseModel):
     stream_id: int
     name: str
@@ -95,6 +96,7 @@ class Channel(BaseModel):
 
 class GroupSettingValue(BaseModel):
     """A group-setting value that can be either a group ID or an object with direct members/subgroups."""
+
     direct_members: Optional[List[int]] = None
     direct_subgroups: Optional[List[int]] = None
 
@@ -103,6 +105,7 @@ class GroupSettingValue(BaseModel):
 
 class UserGroup(BaseModel):
     """Represents a user group in Zulip organization."""
+
     id: int
     name: str
     description: str
@@ -122,4 +125,13 @@ class UserGroup(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
-__all__ = ["Message", "Event", "PrivateRecipient", "ProfileFieldValue", "User", "Channel", "GroupSettingValue", "UserGroup"]
+__all__ = [
+    "Message",
+    "Event",
+    "PrivateRecipient",
+    "ProfileFieldValue",
+    "User",
+    "Channel",
+    "GroupSettingValue",
+    "UserGroup",
+]

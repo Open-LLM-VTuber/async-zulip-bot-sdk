@@ -39,7 +39,9 @@ class I18n:
                     continue
                 primary.update(_load_language_file(base_dir, self.language))
                 if self.language != self.default_language:
-                    fallback.update(_load_language_file(base_dir, self.default_language))
+                    fallback.update(
+                        _load_language_file(base_dir, self.default_language)
+                    )
             except Exception as exc:  # pragma: no cover - defensive logging only
                 logger.warning(f"Failed to load i18n files from {base}: {exc}")
         self._translations = primary
@@ -88,7 +90,9 @@ def build_i18n_for_bot(language: str, bot_module_name: str) -> I18n:
         bot_dir = Path(mod_file).parent
         search_paths.append(bot_dir / "i18n")
     except Exception:  # pragma: no cover - fall back to SDK-only i18n
-        logger.debug(f"Could not resolve module path for {bot_module_name}; using SDK i18n only")
+        logger.debug(
+            f"Could not resolve module path for {bot_module_name}; using SDK i18n only"
+        )
 
     # SDK-level i18n directory.
     sdk_dir = Path(__file__).resolve().parent

@@ -12,7 +12,7 @@ from bot_sdk import BaseBot, CommandInvocation, CommandSpec, Message
 
 class CounterBot(BaseBot):
     """A simple bot that counts messages using persistent storage."""
-        
+
     def register_commands(self) -> None:
         self.command_parser.register_spec(
             CommandSpec(
@@ -21,7 +21,7 @@ class CounterBot(BaseBot):
                 handler=self._handle_count,
             )
         )
-        
+
         self.command_parser.register_spec(
             CommandSpec(
                 name="reset",
@@ -29,7 +29,7 @@ class CounterBot(BaseBot):
                 handler=self._handle_reset,
             )
         )
-        
+
         self.command_parser.register_spec(
             CommandSpec(
                 name="stats",
@@ -37,8 +37,10 @@ class CounterBot(BaseBot):
                 handler=self._handle_stats,
             )
         )
-        
-    async def _handle_count(self, invocation: CommandInvocation, message: Message, bot: BaseBot) -> None:
+
+    async def _handle_count(
+        self, invocation: CommandInvocation, message: Message, bot: BaseBot
+    ) -> None:
         """Increment and display counter using cached storage."""
         if not self.storage:
             await self.send_reply(message, "❌ Storage is not enabled!")
@@ -60,7 +62,9 @@ class CounterBot(BaseBot):
             message, f"🔢 Count: **{counter}** (Total messages: {total})"
         )
 
-    async def _handle_reset(self, invocation: CommandInvocation, message: Message, bot: BaseBot) -> None:
+    async def _handle_reset(
+        self, invocation: CommandInvocation, message: Message, bot: BaseBot
+    ) -> None:
         """Reset counter to zero."""
         if not self.storage:
             await self.send_reply(message, "❌ Storage is not enabled!")
@@ -69,7 +73,9 @@ class CounterBot(BaseBot):
         await self.storage.put("counter", 0)
         await self.send_reply(message, "✅ Counter reset to 0")
 
-    async def _handle_stats(self, invocation: CommandInvocation, message: Message, bot: BaseBot) -> None:
+    async def _handle_stats(
+        self, invocation: CommandInvocation, message: Message, bot: BaseBot
+    ) -> None:
         """Show detailed statistics."""
         if not self.storage:
             await self.send_reply(message, "❌ Storage is not enabled!")

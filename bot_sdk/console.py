@@ -50,20 +50,6 @@ COMMAND_LIST = [
 ]
 
 
-COMMAND_LIST = [
-    "run",
-    "stop",
-    "reload",
-    "status",
-    "bots",
-    "help",
-    "exit",
-    "quit",
-    "makemigrations",
-    "migrate",
-]
-
-
 @dataclass
 class ManagedBot:
     spec: BotSpec
@@ -93,7 +79,6 @@ class BotManager:
         tasks = [self.start_bot(name) for name in self.available_bots]
         results = await asyncio.gather(*tasks)
         return results
-
 
     async def start_bot(self, name: str) -> str:
         async with self._lock:
@@ -180,7 +165,9 @@ class ConsoleUI:
     can refresh it without touching the editing line.
     """
 
-    def __init__(self, manager: BotManager, log_buffer: LogBuffer, console: Console) -> None:
+    def __init__(
+        self, manager: BotManager, log_buffer: LogBuffer, console: Console
+    ) -> None:
         self.manager = manager
         self.log_buffer = log_buffer
         self.console = console
@@ -200,39 +187,51 @@ class ConsoleUI:
         # Calculate visible log lines based on console height
         # Approx height available for logs = total - status(5) - prompt(2) - borders(~7)
         log_height = max(8, self.console.height - 9)
-        
+
         lines = self.log_buffer.lines
         total_lines = len(lines)
-        
+
         # Calculate slice
         if self.scroll_offset > total_lines - log_height:
-             self.scroll_offset = max(0, total_lines - log_height)
-        
+            self.scroll_offset = max(0, total_lines - log_height)
+
         start_idx = max(0, total_lines - log_height - self.scroll_offset)
         end_idx = total_lines - self.scroll_offset if self.scroll_offset > 0 else None
-        
+
         visible_chunk = lines[start_idx:end_idx]
         log_content = Text.from_ansi("\n".join(visible_chunk))
-        
+
         title = f"Logs ({self.scroll_offset})" if self.scroll_offset > 0 else "Logs"
-        layout["logs"].update(Panel(log_content, title=title, border_style="cyan", padding=(0, 1)))
+        layout["logs"].update(
+            Panel(log_content, title=title, border_style="cyan", padding=(0, 1))
+        )
 
         status_table = Table.grid(expand=True, padding=(0, 10))
         status_table.add_column(justify="left", no_wrap=True, style="bold")
         status_table.add_column(justify="left", ratio=1, no_wrap=False)
-        status_table.add_row("Running", ", ".join(self.manager.running_bots) or "none", style="green")
-        status_table.add_row("Available", ", ".join(self.manager.available_bots) or "none", style="cyan")
-        help_text = _command_help_suggestions(command_buffer, self.manager.available_bots)
+        status_table.add_row(
+            "Running", ", ".join(self.manager.running_bots) or "none", style="green"
+        )
+        status_table.add_row(
+            "Available", ", ".join(self.manager.available_bots) or "none", style="cyan"
+        )
+        help_text = _command_help_suggestions(
+            command_buffer, self.manager.available_bots
+        )
         help_state = _command_help_state(command_buffer, self.manager.available_bots)
         help_cell = _render_help_cell(help_text, help_state)
         status_table.add_row("Command Help", help_cell, style="magenta")
-        layout["status"].update(Panel(status_table, title="Status", border_style="magenta", padding=(0, 1)))
+        layout["status"].update(
+            Panel(status_table, title="Status", border_style="magenta", padding=(0, 1))
+        )
 
         # Add cursor effect
         prompt_content = Text("bot-console> ", style="bold yellow")
         prompt_content.append(command_buffer)
         prompt_content.append("█", style="blink")
-        layout["prompt"].update(Panel(prompt_content, title="Command", border_style="green", padding=(0, 1)))
+        layout["prompt"].update(
+            Panel(prompt_content, title="Command", border_style="green", padding=(0, 1))
+        )
 
         return layout
 
@@ -425,7 +424,9 @@ async def _handle_command(
         _print_help(output_func, manager)
         return False
     if cmd == "bots":
-        output_func(f"Configured bots: {', '.join(manager.available_bots) if manager.available_bots else 'none'}")
+        output_func(
+            f"Configured bots: {', '.join(manager.available_bots) if manager.available_bots else 'none'}"
+        )
         return False
     if cmd == "status":
         running = manager.running_bots
@@ -483,7 +484,7 @@ async def _handle_command(
         # Stop bot if running to release file locks (important for migrations/reloads)
         if bot_name in manager.running_bots:
             await manager.stop_bot(bot_name, reason="reload")
-            
+
         result = await manager.reload_bot(spec)
         output_func(result)
         return False
@@ -521,7 +522,9 @@ async def _handle_command(
     return False
 
 
-async def _load_spec(bot_name: str, config_path: Path, bots_dir: str, reload_modules: bool) -> Optional[BotSpec]:
+async def _load_spec(
+    bot_name: str, config_path: Path, bots_dir: str, reload_modules: bool
+) -> Optional[BotSpec]:
     app_config = load_config(str(config_path), AppConfig)
     specs = discover_bot_factories(app_config, bots_dir, reload_modules=reload_modules)
     for spec in specs:
@@ -530,10 +533,14 @@ async def _load_spec(bot_name: str, config_path: Path, bots_dir: str, reload_mod
     return None
 
 
-async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", log_level: str = "INFO") -> None:
+async def run_console(
+    config_path: str = "bots.yaml", bots_dir: str = "bots", log_level: str = "INFO"
+) -> None:
     cfg_path = Path(config_path)
     if not cfg_path.exists():
-        raise FileNotFoundError("bots.yaml not found; please create it to list bots to launch")
+        raise FileNotFoundError(
+            "bots.yaml not found; please create it to list bots to launch"
+        )
 
     app_config = load_config(str(cfg_path), AppConfig)
     specs = discover_bot_factories(app_config, bots_dir)
@@ -561,7 +568,9 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
 
             # 重新添加 system.log 文件 sink（与 setup_logging 一致，但不再写 stdout）
             system_logger = logger.bind(bot_name="SYSTEM")
-            system_filter = lambda record: record.get("extra", {}).get("bot_name") == "SYSTEM"
+            system_filter = lambda record: (
+                record.get("extra", {}).get("bot_name") == "SYSTEM"
+            )
             system_logger.add(
                 LOG_FOLDER / "system.log",
                 level=log_level,
@@ -583,7 +592,9 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
                 "<cyan>{name}:{line}</cyan> | "
                 "<level>{message}</level>"
             )
-            logger.add(log_sink, format=fmt, level=log_level, enqueue=True, colorize=True)
+            logger.add(
+                log_sink, format=fmt, level=log_level, enqueue=True, colorize=True
+            )
 
             def output_to_logs(msg: str) -> None:
                 logger.info(msg)
@@ -622,7 +633,9 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
                                     command_history.insert(0, cmd)
                                 live.update(ui.render(command_buffer), refresh=True)
                                 logger.info(f"> {cmd}")  # Echo command to logs
-                                should_exit = await _handle_command(cmd, manager, cfg_path, bots_dir, output_to_logs)
+                                should_exit = await _handle_command(
+                                    cmd, manager, cfg_path, bots_dir, output_to_logs
+                                )
                                 if should_exit:
                                     await manager.stop_all()
                                     return
@@ -638,7 +651,6 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
                         elif ch in {b"\xe0", b"\x00"}:  # Arrow keys prefix
                             sc = msvcrt.getch()
                             if sc == b"H":  # Up
-                                # 没有正在编辑的命令时，用于滚动日志（包括鼠标滚轮映射的 Up）
                                 if not command_buffer and history_idx == 0:
                                     ui.scroll_offset += 5
                                 else:
@@ -649,7 +661,6 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
                                         command_buffer = command_history[history_idx]
                                         history_idx += 1
                             elif sc == b"P":  # Down
-                                # 同理，如果没有命令历史在浏览，就用来向下滚动日志
                                 if not command_buffer and history_idx == 0:
                                     ui.scroll_offset = max(0, ui.scroll_offset - 5)
                                 else:
@@ -658,7 +669,9 @@ async def run_console(config_path: str = "bots.yaml", bots_dir: str = "bots", lo
                                         if history_idx == 0:
                                             command_buffer = ""
                                         else:
-                                            command_buffer = command_history[history_idx - 1]
+                                            command_buffer = command_history[
+                                                history_idx - 1
+                                            ]
                                     else:
                                         command_buffer = ""
                                         history_idx = 0
