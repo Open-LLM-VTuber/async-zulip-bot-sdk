@@ -140,4 +140,4 @@ def get_bot_logger(
     return bot_logger
 
 
-__all__ = ["setup_logging", "logger", "get_bot_logger", "LoggerType"]
+__all__ = ["setup_logging", "logger", "get_bot_logger", "Logger"]
